@@ -72,16 +72,17 @@ export async function saveCampaign(id, values) {
 		return { error: `The content is ${Math.ceil(bytes / 1000)} KB. The limit is ${MAX_BODY_BYTES / 1000} KB.` };
 	}
 
-	// The editor opens Markdown drafts as rich text, so their first save moves them to it.
-	const format = campaign.format === "markdown" ? "rich" : campaign.format;
-	const thumbnailUrl = firstImageUrl({ format, html: body });
+	// Drafts switch between the editor (rich) and Markdown; a designed HTML document stays HTML.
+	const format = campaign.format === "html" ? "html" : values?.format === "markdown" ? "markdown" : "rich";
+	const isMarkdown = format === "markdown";
+	const thumbnailUrl = firstImageUrl({ format, html: body, markdown: body });
 	const isSaved = await updateCampaign(
 		campaign._id,
 		{
 			subject: String(values?.subject ?? "").slice(0, MAX_SUBJECT_LENGTH),
 			previewText: String(values?.previewText ?? "").slice(0, 300),
 			format,
-			html: body,
+			...(isMarkdown ? { markdown: body, html: "" } : { html: body, markdown: "" }),
 			thumbnailUrl: thumbnailUrl ?? null,
 		},
 		EDITABLE_STATUSES
