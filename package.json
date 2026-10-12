@@ -13,10 +13,11 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test \"tests/*.test.mjs\"; unit=$?; npm run test:db && exit $unit",
-    "test:db": "node --import ./tests/helpers/register.mjs --test \"tests/db/*.test.mjs\"",
+    "test:db": "node --import ./scripts/node/register.mjs --test \"tests/db/*.test.mjs\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:local": "node scripts/local-db.mjs"
+    "db:local": "node scripts/local-db.mjs",
+    "import:mailerlite": "node --import ./scripts/node/register.mjs scripts/mailerlite/import.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1146.0",
@@ -58,6 +59,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "shadcn": "^4.21.1",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "turndown": "7.2.4"
   }
 }

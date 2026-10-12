@@ -1,0 +1,135 @@
+[
+ {
+  "id": "200780191643993423",
+  "name": "[Supadata] Rewards & team",
+  "type": "regular",
+  "status": "sent",
+  "filter": [
+   [
+    {
+     "operator": "in_any",
+     "args": [
+      "groups",
+      [
+       "142494481993696777"
+      ]
+     ]
+    }
+   ]
+  ],
+  "started_at": "2026-10-08 17:38:04",
+  "finished_at": "2026-10-08 17:40:46",
+  "stats": {
+   "sent": 70361,
+   "opens_count": 13965,
+   "clicks_count": 247,
+   "unsubscribes_count": 422,
+   "hard_bounces_count": 90,
+   "spam_count": 0,
+   "deliveries_count": 70271
+  },
+  "emails": [
+   {
+    "subject": "Earn free credits with Supadata \ud83c\udf81",
+    "preheader": "Post, invite, publish. Up to 1,500 bonus credits every month, verified automatically.",
+    "from": "rafal@supadata.ai",
+    "from_name": "Rafal",
+    "reply_to": "support@supadata.ai",
+    "preview_url": "https://preview.mailerlite.io/preview/560622/emails/200780191682790746"
+   }
+  ]
+ },
+ {
+  "id": "145717260096374507",
+  "name": "Reactivation",
+  "type": "regular",
+  "status": "sent",
+  "filter": [
+   [
+    {
+     "operator": "_in_any_segment",
+     "args": [
+      "145717219535357911"
+     ]
+    }
+   ]
+  ],
+  "started_at": "2025-02-18 14:00:11",
+  "finished_at": "2025-02-18 14:01:39",
+  "stats": {
+   "sent": 2618,
+   "opens_count": 564,
+   "clicks_count": 2,
+   "unsubscribes_count": 52,
+   "hard_bounces_count": 5,
+   "spam_count": 0,
+   "deliveries_count": 2613
+  },
+  "emails": [
+   {
+    "subject": "knock knock - are you there?",
+    "preheader": "",
+    "from": "rafal@dumpling.software",
+    "from_name": "Rafal",
+    "reply_to": "support@supadata.ai",
+    "preview_url": "https://preview.mailerlite.io/preview/560622/emails/145717260105811692"
+   }
+  ]
+ },
+ {
+  "id": "145712877935789524",
+  "name": "Supadata cross-promo",
+  "type": "ab",
+  "status": "sent",
+  "filter": [
+   [
+    {
+     "operator": "in_any",
+     "args": [
+      "groups",
+      [
+       "128577143579871085"
+      ]
+     ]
+    }
+   ]
+  ],
+  "started_at": "2025-02-10 14:00:29",
+  "finished_at": "2025-02-10 19:35:08",
+  "stats": {
+   "sent": 5491,
+   "opens_count": 851,
+   "clicks_count": 37,
+   "unsubscribes_count": 48,
+   "hard_bounces_count": 39,
+   "spam_count": 0,
+   "deliveries_count": 5452
+  },
+  "emails": [
+   {
+    "subject": "Hey Makers: Turn YouTube Videos and URLs into Text Easily",
+    "preheader": null,
+    "from": "rafal@dumpling.software",
+    "from_name": "Rafal",
+    "reply_to": "support@supadata.ai",
+    "preview_url": "https://preview.mailerlite.io/preview/560622/emails/145712877946275285"
+   },
+   {
+    "subject": "Meet Supadata: YouTube and Web Scraper for AI Apps",
+    "preheader": null,
+    "from": "rafal@dumpling.software",
+    "from_name": "Rafal",
+    "reply_to": "support@supadata.ai",
+    "preview_url": "https://preview.mailerlite.io/preview/560622/emails/145712877954663895"
+   },
+   {
+    "subject": "Hey Makers: Turn YouTube Videos and URLs into Text Easily",
+    "preheader": null,
+    "from": "rafal@dumpling.software",
+    "from_name": "Rafal",
+    "reply_to": "support@supadata.ai",
+    "preview_url": "https://preview.mailerlite.io/preview/560622/emails/145978668054742296"
+   }
+  ]
+ }
+]

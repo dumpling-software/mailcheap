@@ -20,7 +20,7 @@ const STUBS = {
 	"next/navigation": "export function notFound() { throw new Error('NEXT_NOT_FOUND'); } export function redirect(url) { throw Object.assign(new Error('NEXT_REDIRECT'), { url }); }",
 };
 
-// Lets node --test load app modules: "@/x" resolves like jsconfig's alias, extensionless imports get
+// Lets node (tests, scripts) load app modules: "@/x" resolves like jsconfig's alias, extensionless imports get
 // .js, and Next-only modules become small stand-ins (after() tasks collect in "next/server" pending).
 function withExtension(url) {
 	if (/\.[cm]?js$|\.jsx$|\.json$/.test(url.pathname)) return url;
