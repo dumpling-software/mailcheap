@@ -9,12 +9,22 @@ import BadgeStatus from "@/components/BadgeStatus";
 import DialogDiscardCampaign from "@/components/DialogDiscardCampaign";
 import DialogScheduleCampaign from "@/components/DialogScheduleCampaign";
 import DialogSendCampaign from "@/components/DialogSendCampaign";
+import EditorMarkdown from "@/components/EditorMarkdown";
 import EditorRich from "@/components/EditorRich";
 import HeaderPage from "@/components/HeaderPage";
 import InputCampaignSlug from "@/components/InputCampaignSlug";
 import ListChecks from "@/components/ListChecks";
 import PreviewEmail from "@/components/PreviewEmail";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -43,14 +53,16 @@ export default function FormCampaign({
 }) {
 	const isHtml = campaign.format === "html";
 	const [isDiscardOpen, setIsDiscardOpen] = useState(false);
-	const format = isHtml ? "html" : "rich";
-	const [initialBody] = useState(() =>
-		campaign.format === "markdown" ? markdownToHtml(campaign.markdown) : campaign.html
-	);
+	const [isToRichOpen, setIsToRichOpen] = useState(false);
+	// rich (the editor), markdown (typed as Markdown) or html (a designed document, sent as is).
+	const [format, setFormat] = useState(campaign.format === "markdown" ? "markdown" : isHtml ? "html" : "rich");
+	// The rich editor reads its content once, when it mounts: switching to it mounts a new one.
+	const [richSeed, setRichSeed] = useState(() => ({ key: 0, html: campaign.html }));
 	const [values, setValues] = useState({
 		subject: campaign.subject,
 		previewText: campaign.previewText,
-		body: initialBody,
+		body: campaign.format === "markdown" ? campaign.markdown : campaign.html,
+		format: campaign.format === "markdown" ? "markdown" : isHtml ? "html" : "rich",
 	});
 	const save = useCallback((snapshot) => saveCampaign(campaign._id, snapshot), [campaign._id]);
 	const { isDirty, isSaving, error, flush } = useAutosave(values, save);
@@ -63,7 +75,8 @@ export default function FormCampaign({
 		() =>
 			renderEmail({
 				format,
-				html: deferredValues.body,
+				html: format === "markdown" ? "" : deferredValues.body,
+				markdown: format === "markdown" ? deferredValues.body : "",
 				subject: deferredValues.subject,
 				previewText: deferredValues.previewText,
 				newsletter,
@@ -138,6 +151,23 @@ export default function FormCampaign({
 
 	const updateBody = useCallback((body) => setValues((current) => ({ ...current, body })), []);
 
+	// Markdown to rich converts the text once; there's no way back, so it asks first. An empty draft
+	// switches either way.
+	function switchFormat(next) {
+		if (next === format) return;
+		if (next === "rich" && values.body.trim()) return setIsToRichOpen(true);
+		applyFormat(next);
+	}
+
+	function applyFormat(next) {
+		const body = next === "rich" && format === "markdown" ? markdownToHtml(values.body) : values.body;
+		if (next === "rich") setRichSeed(({ key }) => ({ key: key + 1, html: body }));
+		setFormat(next);
+		setValues((current) => ({ ...current, body, format: next }));
+	}
+
+	const isBodyEmpty = !values.body.replace(/<[^>]*>/g, "").trim();
+
 	const from = newsletter.fromName
 		? `${newsletter.fromName} <${newsletter.fromEmail}>`
 		: newsletter.fromEmail;
@@ -202,6 +232,29 @@ export default function FormCampaign({
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
+				<Dialog open={isToRichOpen} onOpenChange={setIsToRichOpen}>
+					<DialogContent className="sm:max-w-md">
+						<DialogHeader>
+							<DialogTitle>Switch to the editor?</DialogTitle>
+							<DialogDescription>
+								The Markdown becomes formatted text in the editor. This draft can&apos;t go back to Markdown afterwards.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<DialogClose asChild>
+								<Button variant="outline">Keep Markdown</Button>
+							</DialogClose>
+							<Button
+								onClick={() => {
+									setIsToRichOpen(false);
+									applyFormat("rich");
+								}}
+							>
+								Switch
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
 				<DialogDiscardCampaign
 					id={campaign._id}
 					subject={values.subject}
@@ -257,6 +310,37 @@ export default function FormCampaign({
 							/>
 						</Row>
 					)}
+					{!isHtml && (
+						<Row label="Format">
+							<div role="radiogroup" aria-label="Format" className="flex h-11 items-center gap-1">
+								{[
+									["rich", "Editor"],
+									["markdown", "Markdown"],
+								].map(([value, label]) => {
+									const isCurrent = format === value;
+									const isDisabled = value === "markdown" && format === "rich" && !isBodyEmpty;
+									return (
+										<button
+											key={value}
+											type="button"
+											role="radio"
+											aria-checked={isCurrent}
+											disabled={isDisabled}
+											title={isDisabled ? "Empty the editor to write this draft in Markdown" : undefined}
+											onClick={() => switchFormat(value)}
+											className={
+												isCurrent
+													? "h-7 rounded-md bg-foreground px-2.5 text-xs text-background"
+													: "h-7 rounded-md px-2.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+											}
+										>
+											{label}
+										</button>
+									);
+								})}
+							</div>
+						</Row>
+					)}
 					{isHtml ? (
 						<div className="relative">
 							<span className="pointer-events-none absolute top-3 right-4 text-xs text-muted-foreground">HTML</span>
@@ -269,8 +353,10 @@ export default function FormCampaign({
 								className="block min-h-[560px] w-full resize-none bg-transparent px-4 py-4 font-mono text-[13px] leading-6 outline-none [field-sizing:content] placeholder:text-muted-foreground"
 							/>
 						</div>
+					) : format === "markdown" ? (
+						<EditorMarkdown value={values.body} onChange={updateBody} />
 					) : (
-						<EditorRich content={initialBody} onChange={updateBody} />
+						<EditorRich key={richSeed.key} content={richSeed.html} onChange={updateBody} />
 					)}
 				</div>
 

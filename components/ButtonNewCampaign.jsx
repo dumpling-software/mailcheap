@@ -14,12 +14,13 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export default function ButtonNewCampaign({ newsletters }) {
+// Also creates automations: pass their server action as action.
+export default function ButtonNewCampaign({ newsletters, action = createCampaign }) {
 	const [isPending, startTransition] = useTransition();
 
 	function create(newsletterId) {
 		startTransition(async () => {
-			const result = await createCampaign(newsletterId);
+			const result = await action(newsletterId);
 			if (result?.error) toast.error(result.error);
 		});
 	}

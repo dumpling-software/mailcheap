@@ -117,7 +117,21 @@ function getExamples(appUrl) {
 			code: `curl -X POST ${appUrl}/api/v1/contacts \\
   -H "Authorization: Bearer $MAILCHEAP_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"newsletter":"weekly","email":"jane@example.com","source":"website"}'`,
+  -d '{"newsletter":"weekly","email":"jane@example.com","source":"website","properties":{"plan":"free"}}'`,
+		},
+		{
+			title: "Record an event (starts and wakes automations)",
+			code: `curl -X POST ${appUrl}/api/v1/events \\
+  -H "Authorization: Bearer $MAILCHEAP_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"newsletter":"weekly","email":"jane@example.com","name":"api_key_created"}'`,
+		},
+		{
+			title: "Erase a contact (GDPR)",
+			code: `curl -X DELETE ${appUrl}/api/v1/contacts \\
+  -H "Authorization: Bearer $MAILCHEAP_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"email":"jane@example.com"}'`,
 		},
 		{
 			title: "Create a draft campaign",
