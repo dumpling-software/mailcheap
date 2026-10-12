@@ -3,7 +3,7 @@
 //
 //   npm run import:mailerlite -- <stage...|all> [--dry-run] [--refresh]
 //
-// Stages, in order: newsletters, attribution, contacts, campaigns, content, activity, automations.
+// Stages, in order: newsletters, attribution, contacts, campaigns, content, activity, engagement, automations.
 // Needs MAILERLITE_API_KEY and DATABASE_URL (DIRECT_URL works better for long runs), and SUPABASE_URL
 // with SUPABASE_SERVICE_ROLE_KEY to move images off MailerLite. Every write is an upsert keyed on
 // MailerLite's ids, so running a stage again is safe; contacts only ever get stricter statuses, so a
@@ -25,6 +25,7 @@ import {
 	mapCampaign,
 	mapSubscriber,
 } from "../../lib/mailerlite/map.js";
+import { mailboxProvider } from "../../lib/providers.js";
 import { firstImageUrl } from "../../lib/thumbnail.js";
 import { createClient } from "./client.mjs";
 
@@ -35,7 +36,7 @@ const GROUPS = {
 	"128577143579871085": "gistly",
 };
 const NAMES = { supadata: "Supadata", poof: "Poof", gistly: "Gistly" };
-const STAGES = ["newsletters", "attribution", "contacts", "campaigns", "content", "activity", "automations"];
+const STAGES = ["newsletters", "attribution", "contacts", "campaigns", "content", "activity", "engagement", "automations"];
 const SUBSCRIBER_STATUSES = ["active", "unsubscribed", "unconfirmed", "bounced", "junk"];
 const BATCH = 1000;
 const MAX_EMAIL_BYTES = 100_000;
@@ -93,7 +94,7 @@ async function rehost(html) {
 	const { html: cleaned, imageUrls } = cleanMailerLiteHtml(html);
 	if (imageUrls.length === 0 || isDryRun) return cleaned;
 	if (!isImageStorageConfigured()) {
-		note("images left on MailerLite (no SUPABASE_URL)", imageUrls.length);
+		count("images left on MailerLite (no SUPABASE_URL)", imageUrls.length);
 		return cleaned;
 	}
 	const replacements = {};
@@ -394,7 +395,10 @@ async function stageActivity() {
 					missing++;
 					continue;
 				}
-				values.push(mapActivity(entry, { campaignId: row._id, newsletterId: row.newsletterId, contactId, sentAt, bounced: bounced.has(email) }));
+				values.push({
+					...mapActivity(entry, { campaignId: row._id, newsletterId: row.newsletterId, contactId, sentAt, bounced: bounced.has(email) }),
+					provider: mailboxProvider(email),
+				});
 			}
 			if (values.length > 0) await db.insert(messages).values(values).onConflictDoNothing();
 			count("messages", values.length);
@@ -409,9 +413,17 @@ async function stageActivity() {
 		log(`activity for "${row.subject}" done`);
 	}
 
-	// Engagement per contact from the history, so most-engaged-first sends and the list cleanup work from
-	// the first send. ignored_issues counts issues since the last open or click.
+}
+
+// Engagement per contact from the imported history, so most-engaged-first sends and the list cleanup
+// work from the first send. ignored_issues counts issues since the last open or click.
+async function stageEngagement() {
+	if (isDryRun) return;
 	const ids = Object.values(await getNewsletterIds());
+	// Fresh statistics first: right after a bulk insert the planner would guess tiny tables and pick
+	// nested loops over hundreds of thousands of rows.
+	await query(sql`analyze messages`);
+	await query(sql`analyze contacts`);
 	await query(sql`
 		with per_contact as (
 			select contact_id, max(sent_at) as last_sent, max(opened_at) as last_open, max(clicked_at) as last_click,
@@ -476,6 +488,7 @@ const RUN = {
 	campaigns: stageCampaigns,
 	content: stageContent,
 	activity: stageActivity,
+	engagement: stageEngagement,
 	automations: stageAutomations,
 };
 
