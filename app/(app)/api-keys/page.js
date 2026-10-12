@@ -14,15 +14,24 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { getAppUrl } from "@/lib/config";
-import { connectDb } from "@/lib/db";
+import { desc } from "drizzle-orm";
+import { apiKeys as apiKeysTable, getDb } from "@/lib/db";
 import { formatDate, formatRelative } from "@/lib/format";
-import ApiKey from "@/models/ApiKey";
 
 export const metadata = { title: "API keys" };
 
 export default async function ApiKeysPage() {
-	await connectDb();
-	const apiKeys = await ApiKey.find().sort({ createdAt: -1 }).select("-hash").lean();
+	const apiKeys = await getDb()
+		.select({
+			_id: apiKeysTable._id,
+			name: apiKeysTable.name,
+			prefix: apiKeysTable.prefix,
+			lastUsedAt: apiKeysTable.lastUsedAt,
+			revokedAt: apiKeysTable.revokedAt,
+			createdAt: apiKeysTable.createdAt,
+		})
+		.from(apiKeysTable)
+		.orderBy(desc(apiKeysTable.createdAt));
 	const examples = getExamples(getAppUrl());
 
 	return (

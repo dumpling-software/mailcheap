@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isObjectIdString, isPlainObject, normalizeEmail } from "../lib/validation.js";
+import { fromCompactId, isPlainObject, isUuid, normalizeEmail, toCompactId } from "../lib/validation.js";
 
 test("emails are trimmed and lowercased", () => {
 	const accepted = [
@@ -44,12 +44,20 @@ test("addresses SES can't take as a single recipient are rejected", () => {
 	for (const input of rejected) assert.equal(normalizeEmail(input), null, String(input));
 });
 
-test("ObjectId strings are exactly 24 hex characters", () => {
-	assert.equal(isObjectIdString("64f1a2b3c4d5e6f7a8b9c0d1"), true);
-	assert.equal(isObjectIdString("64F1A2B3C4D5E6F7A8B9C0D1"), true);
-	for (const value of ["64f1a2b3c4d5e6f7a8b9c0d", "64f1a2b3c4d5e6f7a8b9c0dz", "aaaaaaaaaaaa", 42, null]) {
-		assert.equal(isObjectIdString(value), false, String(value));
+test("ids are UUIDs, in any case", () => {
+	assert.equal(isUuid("64f1a2b3-c4d5-e6f7-a8b9-c0d100000000"), true);
+	assert.equal(isUuid("64F1A2B3-C4D5-E6F7-A8B9-C0D100000000"), true);
+	for (const value of ["64f1a2b3c4d5e6f7a8b9c0d1", "64f1a2b3-c4d5-e6f7-a8b9-c0d10000000z", "64f1a2b3c4d5e6f7a8b9c0d100000000", 42, null]) {
+		assert.equal(isUuid(value), false, String(value));
 	}
+});
+
+test("compact ids drop the dashes and come back as the same UUID", () => {
+	const id = "64f1a2b3-c4d5-e6f7-a8b9-c0d100000000";
+	assert.equal(toCompactId(id), "64f1a2b3c4d5e6f7a8b9c0d100000000");
+	assert.equal(fromCompactId(toCompactId(id.toUpperCase())), id);
+	assert.equal(fromCompactId("64f1a2b3c4d5e6f7a8b9c0d1"), null);
+	assert.equal(fromCompactId(id), null);
 });
 
 test("plain objects exclude arrays and null", () => {

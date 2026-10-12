@@ -1,22 +1,21 @@
 "use server";
 
-import { isValidObjectId } from "mongoose";
+import { isUuid } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
-import { withEngagement } from "@/lib/cleanup";
 import { importContactRows } from "@/lib/contact-import";
 import { MAX_IMPORT_ROWS_PER_REQUEST } from "@/lib/csv-import";
-import { connectDb } from "@/lib/db";
-import Contact from "@/models/Contact";
-import Newsletter from "@/models/Newsletter";
+import { and, eq, inArray } from "drizzle-orm";
+import { contacts, getDb } from "@/lib/db";
+import { engagement } from "@/lib/engagement";
+import { findNewsletter } from "@/lib/records";
 
 export async function importContacts({ newsletterId, rows }) {
 	await requireSession();
-	if (!isValidObjectId(newsletterId)) return { error: "Newsletter not found" };
+	if (!isUuid(newsletterId)) return { error: "Newsletter not found" };
 	if (!Array.isArray(rows) || rows.length > MAX_IMPORT_ROWS_PER_REQUEST) return { error: "Too many rows" };
 
-	await connectDb();
-	if (!(await Newsletter.exists({ _id: newsletterId }))) return { error: "Newsletter not found" };
+	if (!(await findNewsletter(newsletterId))) return { error: "Newsletter not found" };
 
 	const result = await importContactRows({ newsletterId, rows });
 	revalidatePath("/contacts");
@@ -25,23 +24,20 @@ export async function importContacts({ newsletterId, rows }) {
 
 export async function setContactStatus(id, status) {
 	await requireSession();
-	if (!isValidObjectId(id) || !["active", "unsubscribed"].includes(status)) {
+	if (!isUuid(id) || !["active", "unsubscribed"].includes(status)) {
 		return { error: "Invalid request" };
 	}
-	await connectDb();
 
 	// Reactivation only applies to dormant contacts; unsubscribes, bounces and complaints are final. It
 	// starts the list cleanup over, or the next send would make them dormant again.
-	const filter =
-		status === "active"
-			? { _id: id, status: "dormant" }
-			: { _id: id, status: { $in: ["active", "dormant", "pending"] } };
-	const update =
-		status === "active"
-			? withEngagement({ $set: { status } })
-			: { $set: { status, unsubscribedAt: new Date() } };
-	const { modifiedCount } = await Contact.updateOne(filter, update);
+	const from = status === "active" ? ["dormant"] : ["active", "dormant", "pending"];
+	const changes = status === "active" ? { status, ...engagement() } : { status, unsubscribedAt: new Date() };
+	const updated = await getDb()
+		.update(contacts)
+		.set(changes)
+		.where(and(eq(contacts._id, id), inArray(contacts.status, from)))
+		.returning({ _id: contacts._id });
 
 	revalidatePath("/contacts");
-	return modifiedCount ? { ok: true } : { error: "Status cannot change" };
+	return updated.length > 0 ? { ok: true } : { error: "Status cannot change" };
 }

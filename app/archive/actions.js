@@ -3,14 +3,13 @@
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { sendAlert } from "@/lib/alerts";
-import { isSendingEnabled } from "@/lib/config";
+import { isArchiveEnabled, isSendingEnabled } from "@/lib/config";
 import { upsertContact } from "@/lib/contacts";
-import { connectDb } from "@/lib/db";
 import { getInbox } from "@/lib/inbox-links";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { queueConfirmationEmail, queueWelcomeEmail } from "@/lib/sending";
 import { normalizeEmail } from "@/lib/validation";
-import Newsletter from "@/models/Newsletter";
+import { findNewsletterBySlug } from "@/lib/records";
 
 const PER_IP = { name: "subscribe-ip", limit: 5, window: "10 m" };
 // Only alerts: refusing signups past a shared limit would let one flooder block every real signup.
@@ -28,11 +27,8 @@ export async function subscribe(_state, formData) {
 		return { error: "Too many signups from your network. Try again in a few minutes." };
 	}
 
-	await connectDb();
-	const newsletter = await Newsletter.findOne({
-		slug: String(formData.get("newsletter") ?? ""),
-		archiveEnabled: true,
-	}).lean();
+	const found = isArchiveEnabled() ? await findNewsletterBySlug(String(formData.get("newsletter") ?? "")) : null;
+	const newsletter = found?.archiveEnabled ? found : null;
 	if (!newsletter) return { error: "This newsletter is not taking signups" };
 
 	if (await isRateLimited({ ...PER_NEWSLETTER, key: newsletter.slug })) {

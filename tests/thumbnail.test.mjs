@@ -5,10 +5,10 @@ import { firstImageUrl, isOptimizableImage } from "../lib/thumbnail.js";
 
 test("only local and Blob pictures go through Next's resizer", () => {
 	assert.equal(isOptimizableImage("/authors/jane.jpg"), true);
-	assert.equal(isOptimizableImage("https://abc123.public.blob.vercel-storage.com/uploads/a-x.webp"), true);
+	assert.equal(isOptimizableImage("https://abcdefgh.supabase.co/storage/v1/object/public/uploads/images/a-x.webp"), true);
 	assert.equal(isOptimizableImage("https://images.example.com/uploads/a.png"), false);
 	assert.equal(isOptimizableImage("https://mailcheap.example.com/archive/weekly/og?p=x"), false);
-	assert.equal(isOptimizableImage("https://evil.test/x.public.blob.vercel-storage.com/a.png"), false);
+	assert.equal(isOptimizableImage("https://evil.test/x.supabase.co/storage/v1/object/public/a.png"), false);
 });
 
 test("the first real image of an issue becomes its thumbnail", () => {

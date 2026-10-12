@@ -81,8 +81,8 @@ test("share links carry the issue URL", () => {
 
 test("Feedback-ID has campaign, newsletter, kind and sender fields", () => {
 	assert.equal(
-		getFeedbackId({ campaignId: "64f1a2b3c4d5e6f7a8b9c0d1", kind: "campaign", newsletterSlug: "weekly" }),
-		"64f1a2b3c4d5e6f7a8b9c0d1:weekly:campaign:mailcheap"
+		getFeedbackId({ campaignId: "64f1a2b3-c4d5-e6f7-a8b9-c0d100000000", kind: "campaign", newsletterSlug: "weekly" }),
+		"64f1a2b3-c4d5-e6f7-a8b9-c0d100000000:weekly:campaign:mailcheap"
 	);
 	assert.equal(getFeedbackId({ kind: "welcome", newsletterSlug: "week:ly" }), "welcome:weekly:welcome:mailcheap");
 });

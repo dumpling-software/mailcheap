@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { getSesEventPlan } from "../lib/ses-event-mapping.js";
 
-const messageId = "64f1a2b3c4d5e6f7a8b9c0d1";
+const messageId = "64f1a2b3-c4d5-e6f7-a8b9-c0d100000000";
 const mail = {
 	timestamp: "2026-10-04T10:00:00.000Z",
 	messageId: "0100019000000abc-11112222-3333-4444-5555-666677778888-000000",

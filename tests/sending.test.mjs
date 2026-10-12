@@ -19,14 +19,14 @@ process.env.SESSION_SECRET = "test-session-secret-with-at-least-32-characters";
 process.env.APP_URL = "https://mail.example.com";
 
 const newsletter = {
-	_id: "74f1a2b3c4d5e6f7a8b9c0d2",
+	_id: "74f1a2b3-c4d5-e6f7-a8b9-c0d200000000",
 	name: "Field notes",
 	fromName: "Jane Doe",
 	fromEmail: "jane@example.net",
 	replyTo: "",
 	postalAddress: "1 Main St, Paris",
 };
-const contact = { _id: "64f1a2b3c4d5e6f7a8b9c0d1", email: "reader@example.com" };
+const contact = { _id: "64f1a2b3-c4d5-e6f7-a8b9-c0d100000000", email: "reader@example.com" };
 const campaign = {
 	format: "markdown",
 	subject: "Issue 12",
@@ -78,7 +78,7 @@ test("issues link to their archive page; drafts to the one their subject gives",
 	process.env.ARCHIVE_ENABLED = "true";
 	t.after(() => delete process.env.ARCHIVE_ENABLED);
 	const archived = { ...newsletter, slug: "weekly", archiveEnabled: true };
-	const issue = { ...campaign, _id: "84f1a2b3c4d5e6f7a8b9c0d3", archiveSlug: "issue-12-is-out" };
+	const issue = { ...campaign, _id: "84f1a2b3-c4d5-e6f7-a8b9-c0d300000000", archiveSlug: "issue-12-is-out" };
 
 	const sent = buildRecipientEmail({ campaign: issue, newsletter: archived, contact });
 	assert.ok(sent.html.includes('href="https://mail.example.com/archive/weekly/p/issue-12-is-out"'));
@@ -96,7 +96,7 @@ test("issues link to their archive page; drafts to the one their subject gives",
 test("with archives off for the install, no email links to an archive page", () => {
 	delete process.env.ARCHIVE_ENABLED;
 	const archived = { ...newsletter, slug: "weekly", archiveEnabled: true };
-	const issue = { ...campaign, _id: "84f1a2b3c4d5e6f7a8b9c0d3", archiveSlug: "issue-12-is-out" };
+	const issue = { ...campaign, _id: "84f1a2b3-c4d5-e6f7-a8b9-c0d300000000", archiveSlug: "issue-12-is-out" };
 	assert.equal(getIssueWebUrl({ campaign: issue, newsletter: archived }), null);
 	const sent = buildRecipientEmail({ campaign: issue, newsletter: archived, contact });
 	assert.ok(!sent.html.includes("/archive/"));
@@ -115,7 +115,7 @@ test("each recipient gets a different unsubscribe token", () => {
 	const second = buildRecipientEmail({
 		campaign,
 		newsletter,
-		contact: { _id: "64f1a2b3c4d5e6f7a8b9c0d9", email: "other@example.com" },
+		contact: { _id: "64f1a2b3-c4d5-e6f7-a8b9-c0d900000000", email: "other@example.com" },
 	});
 	assert.notEqual(first.unsubscribeUrl, second.unsubscribeUrl);
 	assert.equal(second.to, "other@example.com");

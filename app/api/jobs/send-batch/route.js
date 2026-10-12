@@ -3,7 +3,7 @@ import { isSendingEnabled } from "@/lib/config";
 import { withQStashSignature } from "@/lib/qstash-route";
 import { sendMessageBatch } from "@/lib/sending";
 import { MAX_BATCH_MESSAGES } from "@/lib/sending-rules";
-import { isObjectIdString } from "@/lib/validation";
+import { isUuid } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -17,7 +17,7 @@ async function handleBatch(request) {
 		Array.isArray(messageIds) &&
 		messageIds.length > 0 &&
 		messageIds.length <= MAX_BATCH_MESSAGES &&
-		messageIds.every(isObjectIdString);
+		messageIds.every(isUuid);
 	if (!isValid) {
 		return NextResponse.json(
 			{ error: `messageIds must be 1 to ${MAX_BATCH_MESSAGES} message ids` },

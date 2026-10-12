@@ -9,7 +9,7 @@ import { createUnsubscribeToken, verifyUnsubscribeToken } from "../lib/unsubscri
 process.env.SESSION_SECRET ||= "test-secret-for-last-chance-links";
 process.env.APP_URL ||= "https://mailcheap.test";
 
-const REFERENCE = { contactId: "64f1a2b3c4d5e6f7a8b9c0a1", newsletterId: "64f1a2b3c4d5e6f7a8b9c0b1" };
+const REFERENCE = { contactId: "64f1a2b3-c4d5-e6f7-a8b9-c0a100000000", newsletterId: "64f1a2b3-c4d5-e6f7-a8b9-c0b100000000" };
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NEWSLETTER = {
 	_id: REFERENCE.newsletterId,
@@ -26,7 +26,7 @@ test("a keep link names one contact and works for 90 days", () => {
 	assert.equal(verifyKeepToken(token, now + 91 * DAY_MS), null);
 
 	const [payload, signature] = token.split(".");
-	const other = { c: "64f1a2b3c4d5e6f7a8b9c0a2", n: REFERENCE.newsletterId, t: Math.floor(now / 1000) };
+	const other = { c: "64f1a2b3-c4d5-e6f7-a8b9-c0a200000000", n: REFERENCE.newsletterId, t: Math.floor(now / 1000) };
 	const forged = Buffer.from(JSON.stringify(other)).toString("base64url");
 	assert.equal(verifyKeepToken(`${forged}.${signature}`), null, "another contact can't reuse the signature");
 	assert.equal(verifyKeepToken(`${payload}.${signature.slice(1)}x`), null);
