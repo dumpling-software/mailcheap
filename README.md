@@ -86,7 +86,7 @@ Plan for about an hour, most of it waiting for DNS and for AWS to approve produc
 ### 1. Database
 
 1. Create a project on [Supabase](https://supabase.com) with a strong database password.
-2. **Connect**: copy the **Transaction pooler** string (port 6543) as `DATABASE_URL` and the **Direct connection** string (port 5432, or the session pooler if your network has no IPv6) as `DIRECT_URL`.
+2. **Connect**: on Vercel, copy the **Transaction pooler** string (port 6543) as `DATABASE_URL`. On a server that keeps running (Railway, a VPS), use the **Session pooler** string (port 5432) instead: through the transaction pooler, a long-lived connection pool's parallel queries can hang. Copy the **Direct connection** string (port 5432, or the session pooler if your network has no IPv6) as `DIRECT_URL`.
 3. Create the tables: `DIRECT_URL=... npm run db:migrate`. Run it again after pulling changes that add migrations (`db/migrations`).
 4. Optional, for image uploads: **Storage > New bucket**, name it `uploads`, make it public, and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Project Settings > API).
 
@@ -224,7 +224,7 @@ Drip sequences per newsletter, started by a signup, an app event or a property c
 
 | Variable | Required | What it does |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | Postgres connection string: Supabase's transaction pooler (port 6543) |
+| `DATABASE_URL` | Yes | Postgres connection string: Supabase's session pooler (port 5432) on a long-running server, the transaction pooler (6543) on Vercel |
 | `DIRECT_URL` | For migrations | Direct Postgres connection (port 5432), used by `npm run db:migrate` |
 | `ADMIN_EMAIL` | Yes | Dashboard login, and where test emails and alerts go |
 | `ADMIN_PASSWORD` | Without Access | Dashboard password, 12+ characters. Changing it signs out every session. |
