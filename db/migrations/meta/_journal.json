@@ -29,6 +29,13 @@
       "when": 1791805971896,
       "tag": "0003_bounce_only_suppressions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791806161514,
+      "tag": "0004_properties_events_scoped_keys",
+      "breakpoints": true
     }
   ]
 }

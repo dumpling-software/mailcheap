@@ -9,7 +9,7 @@ import { isRateLimited } from "@/lib/rate-limit";
 import { ARCHIVE_SLUG_PATTERN } from "@/lib/slug";
 import { firstImageUrl } from "@/lib/thumbnail";
 import { MAX_BODY_BYTES, isPlainObject } from "@/lib/validation";
-import { findNewsletterBySlug } from "@/lib/records";
+import { resolveNewsletter } from "@/lib/contact-events";
 
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_PREVIEW_TEXT_LENGTH = 300;
@@ -70,11 +70,9 @@ export async function GET(request) {
 	if (!apiKey) return fail(401, "Invalid API key");
 	if (await isRateLimited({ ...READS_PER_KEY, key: String(apiKey._id) })) return fail(429, "Too many requests");
 
-	const slug = new URL(request.url).searchParams.get("newsletter")?.trim().toLowerCase();
-	if (!slug) return fail(400, "newsletter is required");
-
-	const newsletter = await findNewsletterBySlug(slug);
-	if (!newsletter) return fail(404, "Newsletter not found");
+	const resolved = await resolveNewsletter(new URL(request.url).searchParams.get("newsletter") ?? "", apiKey);
+	if (resolved.error) return fail(resolved.status, resolved.error);
+	const { newsletter } = resolved;
 
 	const issues = await listPublishedIssues(newsletter._id);
 	const urls = hasArchive(newsletter) ? getArchiveUrls(newsletter) : null;
@@ -98,8 +96,9 @@ export async function POST(request) {
 	const input = readInput(await request.json().catch(() => null));
 	if (input.error) return fail(400, input.error);
 
-	const newsletter = await findNewsletterBySlug(input.slug);
-	if (!newsletter) return fail(404, "Newsletter not found");
+	const resolved = await resolveNewsletter(input.slug, apiKey);
+	if (resolved.error) return fail(resolved.status, resolved.error);
+	const { newsletter } = resolved;
 
 	const [campaign] = await getDb()
 		.insert(campaigns)
