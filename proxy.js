@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAccessEnabled, readAccessToken, verifyAccessToken } from "@/lib/access";
 import { getArchiveHostUrl, getArchiveSlugForHost } from "@/lib/archive-hosts";
 import { isArchiveEnabled } from "@/lib/config";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session-token";
@@ -7,6 +8,7 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/session-token";
 const PUBLIC_PATHS = [
 	/^\/favicon\.ico$/,
 	/^\/login$/,
+	/^\/api\/health$/,
 	/^\/unsubscribe$/,
 	/^\/confirm$/,
 	/^\/keep$/,
@@ -65,6 +67,12 @@ export async function proxy(request) {
 	}
 
 	if (isArchivePath || PUBLIC_PATHS.some((pattern) => pattern.test(pathname))) return NextResponse.next();
+
+	// Behind Cloudflare Access, its token is the session, and there's no login page to send anyone to.
+	if (isAccessEnabled()) {
+		if (await verifyAccessToken(readAccessToken(request.headers, request.cookies))) return NextResponse.next();
+		return NextResponse.json({ error: "Unauthorized: sign in through Cloudflare Access" }, { status: 401 });
+	}
 
 	const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
 	if (session) return NextResponse.next();

@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import FormLogin from "@/components/FormLogin";
 import LogoMailcheap from "@/components/LogoMailcheap";
+import { isAccessEnabled } from "@/lib/access";
 import { getSession } from "@/lib/auth";
 
 export const metadata = { title: "Log in" };
 
 export default async function LoginPage({ searchParams }) {
-	if (await getSession()) redirect("/");
+	// Cloudflare Access signs people in before they get here.
+	if (isAccessEnabled() || (await getSession())) redirect("/");
 	const { next } = await searchParams;
 
 	return (
