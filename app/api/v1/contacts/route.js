@@ -26,7 +26,7 @@ function fail(status, error) {
 function readInput(body) {
 	if (!isPlainObject(body)) return { error: "Send a JSON object" };
 	const { newsletter, email, source, resubscribe, ip } = body;
-	if (typeof newsletter !== "string" || !newsletter.trim()) return { error: "newsletter is required" };
+	if (newsletter !== undefined && typeof newsletter !== "string") return { error: "newsletter must be a slug or an id" };
 
 	const normalizedEmail = normalizeEmail(email);
 	if (!normalizedEmail) return { error: "email is invalid" };

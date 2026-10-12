@@ -85,6 +85,10 @@ test("a key made for one newsletter can't touch another", async () => {
 	assert.equal(other.status, 403);
 	const event = await eventsRoute.POST(request("POST", "/api/v1/events", { newsletter: "poof", email: "c@example.com", name: "x" }, keys.supadata));
 	assert.equal(event.status, 403);
+	const implicit = await eventsRoute.POST(request("POST", "/api/v1/events", { email: "c@example.com", name: "x" }, keys.supadata));
+	assert.equal(implicit.status, 201, "a scoped key can leave the newsletter out");
+	const unscoped = await eventsRoute.POST(request("POST", "/api/v1/events", { email: "c@example.com", name: "x" }));
+	assert.equal(unscoped.status, 400);
 	const draft = await campaignsRoute.POST(request("POST", "/api/v1/campaigns", { newsletter: "poof", subject: "x", markdown: "y" }, keys.supadata));
 	assert.equal(draft.status, 403);
 });

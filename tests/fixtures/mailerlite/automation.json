@@ -1,0 +1,64 @@
+{
+ "id": "178205360042017873",
+ "name": "[Poof] Main nurture",
+ "enabled": true,
+ "triggers": [
+  {
+   "id": "178205360057746516",
+   "type": "subscriber_joins_group",
+   "group_ids": [
+    "177927987388221151"
+   ],
+   "groups": [
+    {
+     "id": "177927987388221151",
+     "name": "poof",
+     "url": "https://dashboard.mailerlite.com/groups/177927987388221151"
+    }
+   ],
+   "exclude_group_ids": [],
+   "excluded_groups": [],
+   "broken": false,
+   "complete": true,
+   "exit_when_no_longer_matches": true
+  }
+ ],
+ "stats": {
+  "completed_subscribers_count": 2932,
+  "subscribers_in_queue_count": 40,
+  "sent": 5927
+ },
+ "steps": [
+  {
+   "id": "178205363831571615",
+   "type": "delay",
+   "parent_id": "178205362203133222",
+   "value": "4",
+   "unit": "days"
+  },
+  {
+   "id": "178230639498102534",
+   "type": "email",
+   "parent_id": "178205363831571615",
+   "name": "Help & feedback",
+   "subject": "Need a hand?",
+   "preheader": null,
+   "email": {
+    "preview_url": "https://preview.mailerlite.io/preview/560622/emails/178230638722156384",
+    "subject": "Need a hand?"
+   }
+  },
+  {
+   "id": "178205362203133222",
+   "type": "email",
+   "parent_id": null,
+   "name": "Welcome email",
+   "subject": "Welcome to Poof",
+   "preheader": "",
+   "email": {
+    "preview_url": "https://preview.mailerlite.io/preview/560622/emails/178205360078718042",
+    "subject": "Welcome to Poof"
+   }
+  }
+ ]
+}

@@ -562,9 +562,8 @@ function NodeSend({ id, node, set, stats, newsletter, automationId, isSendingEna
 							<Textarea
 								value={node.html ?? ""}
 								onChange={(event) => set({ html: event.target.value })}
-								rows={14}
 								spellCheck={false}
-								className="font-mono text-[12px]"
+								className="h-80 font-mono text-[12px] [field-sizing:fixed]"
 							/>
 							<Button
 								variant="outline"

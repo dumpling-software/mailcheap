@@ -44,3 +44,6 @@ next-env.d.ts
 
 # npm run db:local
 /.local-db
+
+# npm run import:mailerlite
+/.import-cache
