@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { ChevronRight, Newspaper, Settings2, TriangleAlert } from "lucide-react";
+import { ChevronRight, Newspaper, TriangleAlert } from "lucide-react";
 import BadgeStatus from "@/components/BadgeStatus";
 import ButtonNewCampaign from "@/components/ButtonNewCampaign";
 import ChartSends from "@/components/ChartSends";
@@ -20,10 +20,10 @@ import {
 import StateEmpty from "@/components/StateEmpty";
 import SwatchChart from "@/components/SwatchChart";
 import TableCampaigns from "@/components/TableCampaigns";
-import TabsNewsletter from "@/components/TabsNewsletter";
 import { Button } from "@/components/ui/button";
 import { findRecentCampaigns } from "@/lib/campaign-queries";
 import { listNewslettersWithActiveCounts } from "@/lib/contacts";
+import { getCurrentNewsletter } from "@/lib/current-newsletter";
 import { formatCompact, formatNumber, formatSigned } from "@/lib/format";
 import { toNewsletterMap, toNewsletterOptions } from "@/lib/newsletters";
 import { getEmailStats, getHourlySends, getSubscriberHistory } from "@/lib/overview-data";
@@ -32,14 +32,16 @@ import { getSesAccount, listSesDomains } from "@/lib/ses";
 import { TIME_ZONE_COOKIE, resolveTimeZone, timeZoneLabel } from "@/lib/time-zone";
 import { cn } from "@/lib/utils";
 
-// Everything above Domains is about one newsletter, the largest unless ?newsletter= picks one. The page
-// waits for one query (the tabs); every section then loads on its own behind a skeleton of its size.
-export default async function OverviewPage({ searchParams }) {
-	const [{ newsletter: newsletterParam }, cookieStore] = await Promise.all([searchParams, cookies()]);
+// Everything above Domains is about the product picked in the sidebar. The page waits for one query;
+// every section then loads on its own behind a skeleton of its size.
+export default async function OverviewPage() {
+	const [cookieStore, newsletters, { current }] = await Promise.all([
+		cookies(),
+		listNewslettersWithActiveCounts(),
+		getCurrentNewsletter(),
+	]);
 	const timeZone = resolveTimeZone(cookieStore.get(TIME_ZONE_COOKIE)?.value);
-	const newsletters = await listNewslettersWithActiveCounts();
-	const bySize = newsletters.toSorted((a, b) => b.activeCount - a.activeCount);
-	const selected = bySize.find(({ _id }) => _id.toString() === newsletterParam) ?? bySize[0];
+	const selected = newsletters.find(({ _id }) => _id === current?._id);
 	const selectedId = selected?._id.toString();
 
 	return (
@@ -50,24 +52,12 @@ export default async function OverviewPage({ searchParams }) {
 			</Suspense>
 
 			<header className="mb-6 flex items-center justify-between gap-3 animate-enter">
-				{selected ? (
-					<div className="flex min-w-0 items-center gap-1">
-						<TabsNewsletter newsletters={bySize} selectedId={selectedId} />
-						<Link
-							href={`/newsletters/${selectedId}`}
-							aria-label={`${selected.name} settings`}
-							title="Newsletter settings"
-							className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
-						>
-							<Settings2 className="size-4" />
-						</Link>
+				<h2 className="truncate text-2xl font-semibold tracking-tight">{selected?.name ?? "Overview"}</h2>
+				{selected && (
+					<div className="shrink-0">
+						<ButtonNewCampaign newsletters={toNewsletterOptions([selected])} />
 					</div>
-				) : (
-					<span />
 				)}
-				<div className="shrink-0">
-					<ButtonNewCampaign newsletters={toNewsletterOptions(newsletters)} />
-				</div>
 			</header>
 
 			<div className="flex flex-col gap-8">
@@ -99,9 +89,9 @@ export default async function OverviewPage({ searchParams }) {
 						</Section>
 					</>
 				) : (
-					<StateEmpty icon={Newspaper} title="No newsletters yet">
+					<StateEmpty icon={Newspaper} title="No products yet">
 						<Button asChild variant="outline" size="sm">
-							<Link href="/newsletters">Go to newsletters</Link>
+							<Link href="/newsletters/new">Add a product</Link>
 						</Button>
 					</StateEmpty>
 				)}

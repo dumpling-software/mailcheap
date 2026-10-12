@@ -8,20 +8,21 @@ import HeaderPage from "@/components/HeaderPage";
 import StateEmpty from "@/components/StateEmpty";
 import { listAutomationsWithCounts } from "@/lib/automations/queries";
 import { formatNumber } from "@/lib/format";
+import { getCurrentNewsletter } from "@/lib/current-newsletter";
 import { toNewsletterOptions } from "@/lib/newsletters";
-import { listNewsletterSummaries } from "@/lib/records";
 
 export const metadata = { title: "Automations" };
 
 export default async function AutomationsPage() {
 	// Rendered per request: run counts change all the time.
 	await connection();
-	const [automations, newsletters] = await Promise.all([listAutomationsWithCounts(), listNewsletterSummaries()]);
+	const { current } = await getCurrentNewsletter();
+	const automations = current ? await listAutomationsWithCounts(current._id) : [];
 
 	return (
 		<>
 			<HeaderPage title="Automations">
-				<ButtonNewCampaign newsletters={toNewsletterOptions(newsletters)} action={createAutomation} />
+				<ButtonNewCampaign newsletters={toNewsletterOptions(current ? [current] : [])} action={createAutomation} />
 			</HeaderPage>
 
 			{automations.length === 0 ? (
@@ -41,7 +42,7 @@ export default async function AutomationsPage() {
 							<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span className="truncate font-medium">{automation.name}</span>
 								<span className="truncate text-sm text-muted-foreground">
-									{automation.newsletterName} · {describeTrigger(automation.trigger)}
+									{describeTrigger(automation.trigger)}
 								</span>
 							</div>
 							<dl className="hidden items-center gap-5 text-right text-sm sm:flex">
