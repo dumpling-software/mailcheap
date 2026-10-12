@@ -8,7 +8,7 @@ process.env.SESSION_SECRET = "test-session-secret-with-at-least-32-characters";
 process.env.APP_URL = "https://mail.example.com";
 
 const BASE = "https://mail.example.com";
-const MESSAGE_ID = "66f1a2b3c4d5e6f7a8b9c0d1";
+const MESSAGE_ID = "66f1a2b3-c4d5-e6f7-a8b9-c0d100000000";
 
 function tokenOf(url) {
 	return url.split("/").pop();
@@ -17,7 +17,7 @@ function tokenOf(url) {
 test("open and click links carry the message and can't be forged", () => {
 	assert.equal(readOpenToken(tokenOf(getOpenUrl(BASE, MESSAGE_ID))), MESSAGE_ID);
 	const openToken = tokenOf(getOpenUrl(BASE, MESSAGE_ID));
-	assert.equal(readOpenToken(openToken.replace(MESSAGE_ID, "66f1a2b3c4d5e6f7a8b9c0d2")), null);
+	assert.equal(readOpenToken(openToken.replace("66f1a2b3c4d5e6f7a8b9c0d1", "66f1a2b3c4d5e6f7a8b9c0d2")), null);
 
 	const url = "https://example.org/?utm_source=newsletter&ref=1";
 	const link = readClickToken(tokenOf(getClickUrl(BASE, MESSAGE_ID, url)));
@@ -52,8 +52,8 @@ test("links go through Mailcheap except unsubscribe links, and the pixel comes f
 test("sent emails are tracked and keep a direct unsubscribe link", () => {
 	const email = buildRecipientEmail({
 		campaign: { format: "rich", subject: "Hi", html: '<p><a href="https://example.org">Example</a></p>' },
-		newsletter: { _id: "74f1a2b3c4d5e6f7a8b9c0d2", name: "Field notes", fromEmail: "hi@mail.example.com" },
-		contact: { _id: "64f1a2b3c4d5e6f7a8b9c0d1", email: "reader@example.com" },
+		newsletter: { _id: "74f1a2b3-c4d5-e6f7-a8b9-c0d200000000", name: "Field notes", fromEmail: "hi@mail.example.com" },
+		contact: { _id: "64f1a2b3-c4d5-e6f7-a8b9-c0d100000000", email: "reader@example.com" },
 		messageId: MESSAGE_ID,
 	});
 	assert.ok(email.html.includes(getOpenUrl(BASE, MESSAGE_ID)));

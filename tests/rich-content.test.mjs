@@ -80,7 +80,7 @@ test("an empty editor document is not content", () => {
 	assert.equal(hasContent("<p>Hi</p>"), true);
 	assert.equal(hasContent('<img src="https://cdn.example.com/a.png">'), true);
 
-	const newsletter = { _id: "74f1a2b3c4d5e6f7a8b9c0d2", name: "Field notes", fromEmail: "jane@example.com" };
+	const newsletter = { _id: "74f1a2b3-c4d5-e6f7-a8b9-c0d200000000", name: "Field notes", fromEmail: "jane@example.com" };
 	const campaign = { format: "rich", subject: "Issue", html: "<p></p>" };
 	assert.equal(getSendProblem({ campaign, newsletter }), "Add content");
 	assert.equal(getSendProblem({ campaign: { ...campaign, html: "<p>Hello</p>" }, newsletter }), null);

@@ -1,7 +1,7 @@
-import { connectDb } from "@/lib/db";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { campaigns, getDb } from "@/lib/db";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
-import { isObjectIdString } from "@/lib/validation";
-import Campaign from "@/models/Campaign";
+import { isUuid } from "@/lib/validation";
 
 const BOT_PATTERN = /bot|crawl|spider|slurp|preview|facebookexternalhit|headless|lighthouse|curl|wget|python|axios|go-http/i;
 const RATE_LIMIT = { name: "views", limit: 30, window: "10 m" };
@@ -14,13 +14,18 @@ function noContent() {
 export async function POST(request) {
 	const userAgent = request.headers.get("user-agent") ?? "";
 	const { id } = await request.json().catch(() => ({}));
-	if (!isObjectIdString(id) || !userAgent || BOT_PATTERN.test(userAgent)) return noContent();
+	if (!isUuid(id) || !userAgent || BOT_PATTERN.test(userAgent)) return noContent();
 	if (await isRateLimited({ ...RATE_LIMIT, key: getClientIp(request.headers) })) return noContent();
 
-	await connectDb();
-	await Campaign.updateOne(
-		{ _id: id, archiveSlug: { $type: "string" }, status: { $in: ["sending", "paused", "sent"] } },
-		{ $inc: { webViews: 1 } }
-	);
+	await getDb()
+		.update(campaigns)
+		.set({ webViews: sql`${campaigns.webViews} + 1` })
+		.where(
+			and(
+				eq(campaigns._id, id),
+				isNotNull(campaigns.archiveSlug),
+				inArray(campaigns.status, ["sending", "paused", "sent"])
+			)
+		);
 	return noContent();
 }

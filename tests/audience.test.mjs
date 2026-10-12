@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildAudienceQuery, selectAudience } from "../lib/audience.js";
+import { selectAudience } from "../lib/audience.js";
 
-const newsletterId = "74f1a2b3c4d5e6f7a8b9c0d2";
 
 function contact(id, fields = {}) {
 	return {
@@ -73,30 +72,4 @@ test("contacts with equal engagement keep a stable order", () => {
 		twins.map(({ _id }) => _id),
 		["b", "a", "c"]
 	);
-});
-
-test("the Mongo query selects the same audience in the same order", () => {
-	const query = buildAudienceQuery({ newsletterId, suppressedEmails, audienceLimit: 500 });
-	assert.deepEqual(query.filter, {
-		newsletterId,
-		status: "active",
-		email: { $nin: suppressedEmails },
-	});
-	assert.deepEqual(Object.entries(query.sort), [
-		["lastClickAt", -1],
-		["lastOpenAt", -1],
-		["imported.clickRate", -1],
-		["imported.openRate", -1],
-		["createdAt", 1],
-		["_id", 1],
-	]);
-	assert.equal(query.limit, 500);
-});
-
-test("the Mongo query skips empty suppression lists and invalid limits", () => {
-	assert.deepEqual(buildAudienceQuery({ newsletterId }).filter, { newsletterId, status: "active" });
-	for (const audienceLimit of [undefined, null, 0, -1, 2.5, "abc"]) {
-		assert.equal(buildAudienceQuery({ newsletterId, audienceLimit }).limit, null);
-	}
-	assert.equal(buildAudienceQuery({ newsletterId, audienceLimit: "250" }).limit, 250);
 });

@@ -1,13 +1,15 @@
 "use server";
 
-import { isValidObjectId } from "mongoose";
+import { isUuid } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { notifyActivity } from "@/lib/alerts";
 import { PUBLISHED_STATUSES, revalidateArchive } from "@/lib/archive-data";
 import { requireSession } from "@/lib/auth";
 import { getAppUrl, isSendingEnabled } from "@/lib/config";
-import { connectDb } from "@/lib/db";
+import { and, eq, inArray, ne } from "drizzle-orm";
+import { campaigns, getDb, isUniqueViolation } from "@/lib/db";
+import { findCampaign as findCampaignById, findNewsletter } from "@/lib/records";
 import { getScheduleProblem } from "@/lib/schedule";
 import { publishScheduledSend } from "@/lib/scheduling";
 import { getCleanupPreview, queueCampaign, sendTestEmail, sendToMoreContacts } from "@/lib/sending";
@@ -15,8 +17,6 @@ import { getSendProblem } from "@/lib/sending-rules";
 import { ARCHIVE_SLUG_PATTERN } from "@/lib/slug";
 import { firstImageUrl } from "@/lib/thumbnail";
 import { MAX_BODY_BYTES } from "@/lib/validation";
-import Campaign from "@/models/Campaign";
-import Newsletter from "@/models/Newsletter";
 
 const MAX_SUBJECT_LENGTH = 200;
 const COPY_SUFFIX = " (copy)";
@@ -38,18 +38,24 @@ function formatCount(count) {
 
 async function findCampaign(id) {
 	await requireSession();
-	if (!isValidObjectId(id)) return null;
-	await connectDb();
-	return Campaign.findById(id);
+	return findCampaignById(id);
+}
+
+// Applies the changes only while the campaign is in one of these statuses; false when it wasn't.
+async function updateCampaign(id, changes, statuses) {
+	const updated = await getDb()
+		.update(campaigns)
+		.set(changes)
+		.where(and(eq(campaigns._id, id), statuses ? inArray(campaigns.status, statuses) : undefined))
+		.returning({ _id: campaigns._id });
+	return updated.length > 0;
 }
 
 export async function createCampaign(newsletterId) {
 	await requireSession();
-	if (!isValidObjectId(newsletterId)) return { error: "Newsletter not found" };
-	await connectDb();
-	if (!(await Newsletter.exists({ _id: newsletterId }))) return { error: "Newsletter not found" };
+	if (!(await findNewsletter(newsletterId))) return { error: "Newsletter not found" };
 
-	const campaign = await Campaign.create({ newsletterId });
+	const [campaign] = await getDb().insert(campaigns).values({ newsletterId }).returning({ _id: campaigns._id });
 	revalidatePath("/campaigns");
 	redirect(`/campaigns/${campaign._id}`);
 }
@@ -69,20 +75,18 @@ export async function saveCampaign(id, values) {
 	// The editor opens Markdown drafts as rich text, so their first save moves them to it.
 	const format = campaign.format === "markdown" ? "rich" : campaign.format;
 	const thumbnailUrl = firstImageUrl({ format, html: body });
-	const { matchedCount } = await Campaign.updateOne(
-		{ _id: campaign._id, status: { $in: EDITABLE_STATUSES } },
+	const isSaved = await updateCampaign(
+		campaign._id,
 		{
-			$set: {
-				subject: String(values?.subject ?? "").slice(0, MAX_SUBJECT_LENGTH),
-				previewText: String(values?.previewText ?? "").slice(0, 300),
-				format,
-				html: body,
-				...(thumbnailUrl && { thumbnailUrl }),
-			},
-			...(!thumbnailUrl && { $unset: { thumbnailUrl: 1 } }),
-		}
+			subject: String(values?.subject ?? "").slice(0, MAX_SUBJECT_LENGTH),
+			previewText: String(values?.previewText ?? "").slice(0, 300),
+			format,
+			html: body,
+			thumbnailUrl: thumbnailUrl ?? null,
+		},
+		EDITABLE_STATUSES
 	);
-	if (!matchedCount) return { error: "This campaign is already sending" };
+	if (!isSaved) return { error: "This campaign is already sending" };
 
 	revalidatePath("/campaigns");
 	return { ok: true };
@@ -105,7 +109,7 @@ export async function sendTestCampaign(id) {
 	if (!isSendingEnabled()) return { error: "Sending is off" };
 
 	const result = await runSend(() =>
-		sendTestEmail({ campaignId: campaign._id.toString(), to: process.env.ADMIN_EMAIL })
+		sendTestEmail({ campaignId: String(campaign._id), to: process.env.ADMIN_EMAIL })
 	);
 	revalidatePath(`/campaigns/${id}`);
 	return result;
@@ -118,11 +122,10 @@ export async function sendCampaign(id, { audienceLimit } = {}) {
 	if (!EDITABLE_STATUSES.includes(campaign.status)) return { error: "Already sent" };
 	if (!isSendingEnabled()) return { error: "Sending is off" };
 
-	campaign.audienceLimit = readAudienceLimit(audienceLimit);
-	campaign.scheduledAt = undefined;
-	await campaign.save();
+	campaign.audienceLimit = readAudienceLimit(audienceLimit) ?? null;
+	await updateCampaign(campaign._id, { audienceLimit: campaign.audienceLimit, scheduledAt: null });
 
-	const result = await runSend(() => queueCampaign(campaign._id.toString()));
+	const result = await runSend(() => queueCampaign(String(campaign._id)));
 	revalidatePath("/campaigns");
 	revalidatePath(`/campaigns/${id}`);
 	if (result.ok) {
@@ -143,19 +146,17 @@ export async function scheduleCampaign(id, { scheduledAt, audienceLimit } = {}) 
 	const at = new Date(scheduledAt ?? NaN);
 	const problem = getScheduleProblem(at);
 	if (problem) return { error: problem };
-	const newsletter = await Newsletter.findById(campaign.newsletterId).lean();
+	const newsletter = await findNewsletter(campaign.newsletterId);
 	const sendProblem = getSendProblem({ campaign, newsletter });
 	if (sendProblem) return { error: sendProblem };
 
 	const limit = readAudienceLimit(audienceLimit);
-	const { matchedCount } = await Campaign.updateOne(
-		{ _id: campaign._id, status: { $in: EDITABLE_STATUSES } },
-		{
-			$set: { status: "scheduled", scheduledAt: at, ...(limit && { audienceLimit: limit }) },
-			...(!limit && { $unset: { audienceLimit: 1 } }),
-		}
+	const isScheduled = await updateCampaign(
+		campaign._id,
+		{ status: "scheduled", scheduledAt: at, audienceLimit: limit ?? null },
+		EDITABLE_STATUSES
 	);
-	if (!matchedCount) return { error: "The campaign changed, refresh and try again" };
+	if (!isScheduled) return { error: "The campaign changed, refresh and try again" };
 
 	try {
 		await publishScheduledSend({ campaignId: campaign._id, scheduledAt: at });
@@ -163,9 +164,12 @@ export async function scheduleCampaign(id, { scheduledAt, audienceLimit } = {}) 
 		console.error("[campaigns] Scheduling failed:", error);
 		const previous =
 			campaign.status === "scheduled"
-				? { $set: { status: "scheduled", scheduledAt: campaign.scheduledAt } }
-				: { $set: { status: "draft" }, $unset: { scheduledAt: 1 } };
-		await Campaign.updateOne({ _id: campaign._id, status: "scheduled", scheduledAt: at }, previous);
+				? { status: "scheduled", scheduledAt: campaign.scheduledAt }
+				: { status: "draft", scheduledAt: null };
+		await getDb()
+			.update(campaigns)
+			.set(previous)
+			.where(and(eq(campaigns._id, campaign._id), eq(campaigns.status, "scheduled"), eq(campaigns.scheduledAt, at)));
 		return { error: `Couldn't schedule it: ${error.message}` };
 	}
 
@@ -180,11 +184,8 @@ export async function unscheduleCampaign(id) {
 	const campaign = await findCampaign(id);
 	if (!campaign) return { error: "Campaign not found" };
 
-	const { matchedCount } = await Campaign.updateOne(
-		{ _id: campaign._id, status: "scheduled" },
-		{ $set: { status: "draft" }, $unset: { scheduledAt: 1 } }
-	);
-	if (!matchedCount) return { error: "It isn't scheduled anymore" };
+	const isUnscheduled = await updateCampaign(campaign._id, { status: "draft", scheduledAt: null }, ["scheduled"]);
+	if (!isUnscheduled) return { error: "It isn't scheduled anymore" };
 
 	revalidatePath("/campaigns");
 	revalidatePath(`/campaigns/${id}`);
@@ -194,7 +195,7 @@ export async function unscheduleCampaign(id) {
 // The send dialogs ask when they open: it walks the whole list.
 export async function previewCleanup(id) {
 	await requireSession();
-	if (!isValidObjectId(id)) return { error: "Campaign not found" };
+	if (!isUuid(id)) return { error: "Campaign not found" };
 	try {
 		return await getCleanupPreview(id);
 	} catch (error) {
@@ -210,7 +211,7 @@ export async function sendCampaignToMore(id, { additional } = {}) {
 	if (!isSendingEnabled()) return { error: "Sending is off" };
 
 	const more = readAudienceLimit(additional);
-	const result = await runSend(() => sendToMoreContacts(campaign._id.toString(), more));
+	const result = await runSend(() => sendToMoreContacts(String(campaign._id), more));
 	revalidatePath("/campaigns");
 	revalidatePath(`/campaigns/${id}`);
 	if (result.ok) await notifySend(campaign, `Send to more started (${more ? `next ${formatCount(more)}` : "everyone left"})`);
@@ -223,7 +224,7 @@ export async function resumeCampaign(id) {
 	if (campaign.status !== "paused") return { error: "Only paused campaigns can resume" };
 	if (!isSendingEnabled()) return { error: "Sending is off" };
 
-	const result = await runSend(() => queueCampaign(campaign._id.toString()));
+	const result = await runSend(() => queueCampaign(String(campaign._id)));
 	revalidatePath(`/campaigns/${id}`);
 	if (result.ok) await notifySend(campaign, "Send resumed");
 	return result;
@@ -232,7 +233,7 @@ export async function resumeCampaign(id) {
 export async function pauseCampaign(id) {
 	const campaign = await findCampaign(id);
 	if (!campaign) return { error: "Campaign not found" };
-	await Campaign.updateOne({ _id: campaign._id, status: "sending" }, { $set: { status: "paused" } });
+	await updateCampaign(campaign._id, { status: "paused" }, ["sending"]);
 	revalidatePath(`/campaigns/${id}`);
 	return { ok: true };
 }
@@ -242,8 +243,7 @@ export async function toggleArchivePin(id) {
 	if (!campaign) return { error: "Campaign not found" };
 	if (!campaign.archiveSlug || campaign.archiveListed === false) return { error: "Not listed on the archive" };
 
-	campaign.archivePinned = !campaign.archivePinned;
-	await campaign.save();
+	await updateCampaign(campaign._id, { archivePinned: !campaign.archivePinned });
 	revalidatePath(`/campaigns/${id}`);
 	revalidateArchive();
 	return { ok: true };
@@ -253,17 +253,20 @@ export async function duplicateCampaign(id) {
 	const campaign = await findCampaign(id);
 	if (!campaign) return { error: "Campaign not found" };
 
-	const copy = await Campaign.create({
-		newsletterId: campaign.newsletterId,
-		subject: campaign.subject ? `${campaign.subject.slice(0, MAX_SUBJECT_LENGTH - COPY_SUFFIX.length)}${COPY_SUFFIX}` : "",
-		previewText: campaign.previewText,
-		format: campaign.format,
-		markdown: campaign.markdown,
-		html: campaign.html,
-		thumbnailUrl: campaign.thumbnailUrl,
-		// A copy of an API draft is still content from the API key's holder, not from the dashboard.
-		...(campaign.source === "api" && { source: "api" }),
-	});
+	const [copy] = await getDb()
+		.insert(campaigns)
+		.values({
+			newsletterId: campaign.newsletterId,
+			subject: campaign.subject ? `${campaign.subject.slice(0, MAX_SUBJECT_LENGTH - COPY_SUFFIX.length)}${COPY_SUFFIX}` : "",
+			previewText: campaign.previewText,
+			format: campaign.format,
+			markdown: campaign.markdown,
+			html: campaign.html,
+			thumbnailUrl: campaign.thumbnailUrl,
+			// A copy of an API draft is still content from the API key's holder, not from the dashboard.
+			...(campaign.source === "api" && { source: "api" }),
+		})
+		.returning({ _id: campaigns._id });
 	revalidatePath("/campaigns");
 	redirect(`/campaigns/${copy._id}`);
 }
@@ -274,11 +277,8 @@ export async function discardCampaign(id) {
 	if (!campaign) return { error: "Campaign not found" };
 	if (!EDITABLE_STATUSES.includes(campaign.status)) return { error: "Only drafts can be discarded" };
 
-	const { matchedCount } = await Campaign.updateOne(
-		{ _id: campaign._id, status: { $in: EDITABLE_STATUSES } },
-		{ $set: { status: "canceled" }, $unset: { scheduledAt: 1 } }
-	);
-	if (!matchedCount) return { error: "This campaign is already sending" };
+	const isDiscarded = await updateCampaign(campaign._id, { status: "canceled", scheduledAt: null }, EDITABLE_STATUSES);
+	if (!isDiscarded) return { error: "This campaign is already sending" };
 
 	revalidatePath("/");
 	revalidatePath("/campaigns");
@@ -296,17 +296,18 @@ export async function updateArchiveSlug(id, value) {
 	if (!slug && isPublished) return { error: "A sent issue needs a URL" };
 	if (slug && !ARCHIVE_SLUG_PATTERN.test(slug)) return { error: "Use lowercase letters, digits and hyphens" };
 	if (slug === (campaign.archiveSlug ?? "")) return { ok: true, archiveSlug: slug };
-	if (slug && (await Campaign.exists({ _id: { $ne: campaign._id }, archiveSlug: slug }))) {
-		return { error: "Another issue uses this URL" };
+	if (slug) {
+		const [taken] = await getDb()
+			.select({ _id: campaigns._id })
+			.from(campaigns)
+			.where(and(ne(campaigns._id, campaign._id), eq(campaigns.archiveSlug, slug)));
+		if (taken) return { error: "Another issue uses this URL" };
 	}
 
 	try {
-		await Campaign.updateOne(
-			{ _id: campaign._id },
-			slug ? { $set: { archiveSlug: slug } } : { $unset: { archiveSlug: 1 } }
-		);
+		await updateCampaign(campaign._id, { archiveSlug: slug || null });
 	} catch (error) {
-		if (error?.code === 11000) return { error: "Another issue uses this URL" };
+		if (isUniqueViolation(error)) return { error: "Another issue uses this URL" };
 		throw error;
 	}
 

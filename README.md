@@ -4,7 +4,7 @@ Mailcheap is a self-hosted newsletter app on Amazon SES. Write an issue, send it
 
 ![Mailcheap overview](docs/screenshots/overview.webp)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmarclou%2Fmailcheap&project-name=mailcheap&repository-name=mailcheap&env=MONGODB_URI,ADMIN_EMAIL,ADMIN_PASSWORD,SESSION_SECRET&envDescription=Database%2C%20login%20and%20signing%20secret.%20ADMIN_PASSWORD%20needs%2012%2B%20characters%2C%20SESSION_SECRET%2032%2B%20%28run%3A%20openssl%20rand%20-base64%2048%29.%20Add%20SES%20and%20QStash%20after%20the%20first%20deploy.&envLink=https%3A%2F%2Fgithub.com%2Fmarclou%2Fmailcheap%23environment-variables)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmarclou%2Fmailcheap&project-name=mailcheap&repository-name=mailcheap&env=DATABASE_URL,ADMIN_EMAIL,ADMIN_PASSWORD,SESSION_SECRET&envDescription=Database%2C%20login%20and%20signing%20secret.%20ADMIN_PASSWORD%20needs%2012%2B%20characters%2C%20SESSION_SECRET%2032%2B%20%28run%3A%20openssl%20rand%20-base64%2048%29.%20Add%20SES%20and%20QStash%20after%20the%20first%20deploy.&envLink=https%3A%2F%2Fgithub.com%2Fmarclou%2Fmailcheap%23environment-variables)
 
 > [!IMPORTANT]
 > **No support.** This is a one-time open-source release. Issues are off, and setup questions go unanswered. Fork it, deploy it, make it yours.
@@ -68,16 +68,16 @@ All names and addresses in the screenshots are made up.
 
 | Service | For | Cost |
 | --- | --- | --- |
-| [MongoDB](https://www.mongodb.com/atlas) | Contacts, campaigns, stats | Free tier works |
+| [Supabase](https://supabase.com) (Postgres) | Contacts, campaigns, stats | Free tier works |
 | [Amazon SES](https://aws.amazon.com/ses/) | Sending | About $0.10 per 1,000 emails |
 | [Upstash QStash](https://upstash.com/docs/qstash) | Background sending and scheduling | Free tier to start, then pay per message. One message sends 50 emails. |
 | [Vercel](https://vercel.com) or any Node.js host | Hosting | Free tier works |
 | [Upstash Redis](https://upstash.com/docs/redis) (optional) | Rate limits shared by every server instance | Free tier |
-| [Vercel Blob](https://vercel.com/docs/vercel-blob) (optional) | Image uploads in the editor | Free tier |
+| Supabase Storage (optional) | Image uploads in the editor | Included |
 
 Without Redis, Mailcheap counts the same rate limits in each server instance's memory. That still stops a script hammering a form, but on serverless hosts the limits aren't shared between instances and reset on each deploy. Add Redis before you put a signup form on a busy site.
 
-Without Blob, image uploads in the editor are off. HTML and Markdown campaigns can still use images hosted anywhere.
+Without Storage keys, image uploads in the editor are off. HTML and Markdown campaigns can still use images hosted anywhere.
 
 ## Setup
 
@@ -85,15 +85,17 @@ Plan for about an hour, most of it waiting for DNS and for AWS to approve produc
 
 ### 1. Database
 
-1. Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/atlas).
-2. **Database Access**: add a user with a password and the "Read and write to any database" role.
-3. **Network Access**: allow `0.0.0.0/0`. Vercel doesn't have fixed IP addresses.
-4. **Connect > Drivers**: copy the connection string and add a database name before the `?`, like `...mongodb.net/mailcheap?retryWrites=true`. That's your `MONGODB_URI`.
+1. Create a project on [Supabase](https://supabase.com) with a strong database password.
+2. **Connect**: copy the **Transaction pooler** string (port 6543) as `DATABASE_URL` and the **Direct connection** string (port 5432, or the session pooler if your network has no IPv6) as `DIRECT_URL`.
+3. Create the tables: `DIRECT_URL=... npm run db:migrate`. Run it again after pulling changes that add migrations (`db/migrations`).
+4. Optional, for image uploads: **Storage > New bucket**, name it `uploads`, make it public, and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Project Settings > API).
+
+Mailcheap connects as the database owner and doesn't use Supabase's REST API. Every table has row level security on with no policies, so the public API keys can't read them.
 
 ### 2. Deploy
 
 1. Click **Deploy** above.
-2. Fill in `MONGODB_URI`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (at least 12 characters) and `SESSION_SECRET` (at least 32; generate it with `openssl rand -base64 48`). With shorter ones, Mailcheap refuses to start and the logs say which one to fix.
+2. Fill in `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (at least 12 characters) and `SESSION_SECRET` (at least 32; generate it with `openssl rand -base64 48`). With shorter ones, Mailcheap refuses to start and the logs say which one to fix.
 3. Open `https://<your-project>.vercel.app/login` and log in.
 
 Sending is off until you finish the next steps, so nothing can go out by mistake. On any other Node.js host: `npm ci && npm run build && npm start`, with the same variables, behind HTTPS.
@@ -158,7 +160,7 @@ QStash calls `APP_URL/api/jobs/...` to send each batch, so the app has to be rea
 - **Archive on its own domain:** add the domain to your Vercel project, then set `ARCHIVE_HOSTS=news.example.com=<newsletter-slug>` and redeploy. That domain serves only the archive and the unsubscribe page, never the dashboard, and the app domain's `/archive/<newsletter-slug>` pages redirect there.
 
   This is the safer setup: issue pages show HTML from your editor and from API keys, and on their own domain that HTML never shares the dashboard's origin. Without one, the archive stays on the app domain, where the sanitizer, the sandboxed frame and the Content Security Policy protect it.
-- **Image uploads:** in Vercel, **Storage > Create > Blob**, connect it to the project, and redeploy.
+- **Image uploads:** create a public `uploads` bucket in Supabase Storage and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 - **Shared rate limits:** create a Redis database in the [Upstash console](https://console.upstash.com/redis) and add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 - **Alerts:** set `ALERT_FROM` (like `Mailcheap <alerts@mail.example.com>`) to get alerts by email at `ADMIN_EMAIL`: spam complaints, paused sends, signup floods and rate limiter outages, plus every login, new API key and send. Otherwise they only show in the logs.
 
@@ -167,15 +169,17 @@ QStash calls `APP_URL/api/jobs/...` to send each batch, so the app has to be rea
 ```bash
 git clone https://github.com/<you>/mailcheap.git && cd mailcheap
 npm install
-cp .env.example .env.local   # set MONGODB_URI, ADMIN_EMAIL, ADMIN_PASSWORD, SESSION_SECRET
+cp .env.example .env.local   # set DATABASE_URL, DIRECT_URL, ADMIN_EMAIL, ADMIN_PASSWORD, SESSION_SECRET
+npm run db:migrate
 npm run dev
 ```
 
-A local MongoDB works: `docker run -d -p 27017:27017 mongo` and `MONGODB_URI=mongodb://127.0.0.1:27017/mailcheap`.
+A local Postgres works too (`supabase start`, or `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:17` with `DATABASE_URL=DIRECT_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres`).
 
 - Sending stays off locally unless you set `SENDING_ENABLED=true`. When the SES keys are empty, the AWS SDK falls back to your default AWS credentials (`~/.aws`), so the domains page can show real data.
 - QStash can't reach `localhost`. To try a full send locally, run the QStash dev server (`npx @upstash/qstash-cli dev`) and use the URL, token and signing keys it prints.
-- `npm test` runs the unit tests and `npm run lint` runs ESLint.
+- `npm test` runs the unit tests, then the database tests against an in-memory Postgres ([PGlite](https://pglite.dev), no setup needed). `npm run lint` runs ESLint.
+- Schema changes: edit `db/schema.js`, run `npm run db:generate`, and commit the new file in `db/migrations`.
 
 ## Deliverability basics
 
@@ -192,7 +196,8 @@ A local MongoDB works: `docker run -d -p 27017:27017 mongo` and `MONGODB_URI=mon
 
 | Variable | Required | What it does |
 | --- | --- | --- |
-| `MONGODB_URI` | Yes | MongoDB connection string with a database name |
+| `DATABASE_URL` | Yes | Postgres connection string: Supabase's transaction pooler (port 6543) |
+| `DIRECT_URL` | For migrations | Direct Postgres connection (port 5432), used by `npm run db:migrate` |
 | `ADMIN_EMAIL` | Yes | Dashboard login, and where test emails and alerts go |
 | `ADMIN_PASSWORD` | Yes | Dashboard password, 12+ characters. Changing it signs out every session. |
 | `SESSION_SECRET` | Yes | Signs sessions and email links. 32+ random characters. Changing it breaks links in sent emails. |
@@ -204,10 +209,11 @@ A local MongoDB works: `docker run -d -p 27017:27017 mongo` and `MONGODB_URI=mon
 | `SES_SNS_TOPIC_ARN` | To send | SNS topic Mailcheap accepts at `/api/webhooks/ses` |
 | `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY` | To send campaigns | Background sending and scheduling |
 | `QSTASH_URL` | No | QStash region other than the default, or a local QStash dev server |
-| `SEND_RATE_PER_SECOND` | No | Emails per second, 1 to 14 (default 10). Use 6 on a free Atlas cluster. |
+| `SEND_RATE_PER_SECOND` | No | Emails per second, 1 to 14 (default 10) |
+| `ARCHIVE_ENABLED` | No | `true` turns on the public archive and "Read online" links. Off by default. |
 | `ARCHIVE_HOSTS` | No | Archive domains, like `news.example.com=weekly,letters.example.org=monthly` |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | No | Shared rate limits |
-| `BLOB_READ_WRITE_TOKEN` | No | Image uploads in the editor (set by Vercel Blob) |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | No | Image uploads to Supabase Storage. `SUPABASE_STORAGE_BUCKET` picks the bucket (`uploads`). |
 | `ALERT_FROM` | No | From address for alert emails, on a verified domain |
 
 [`.env.example`](.env.example) has the same list with more detail.
@@ -236,7 +242,7 @@ curl -X POST https://<your-app>/api/v1/contacts \
 
 ## How it works
 
-- Next.js App Router, JavaScript, Tailwind CSS with shadcn/ui, MongoDB through Mongoose.
+- Next.js App Router, JavaScript, Tailwind CSS with shadcn/ui, Postgres (Supabase) through Drizzle ORM.
 - **Send** picks the audience (active contacts, suppressions left out, most engaged first), creates one message per reader, and queues one QStash job per batch of 50. Each job sends through the SES v2 API at `SEND_RATE_PER_SECOND` and pauses the campaign if bounce or complaint rates pass the limits.
 - Welcome and confirmation emails go out right away, capped at 100 every 10 minutes per newsletter.
 - SES publishes events to SNS, which posts them to `/api/webhooks/ses`. Mailcheap verifies the SNS signature, updates the message, the campaign stats and the contact, and suppresses bounced and complaining addresses for every newsletter.

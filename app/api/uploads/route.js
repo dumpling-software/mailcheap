@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth";
-import { putImage } from "@/lib/blob";
+import { isImageStorageConfigured, putImage } from "@/lib/blob";
 import { MAX_UPLOAD_BYTES } from "@/lib/upload-image";
 import { slugify } from "@/lib/slug";
 
@@ -13,8 +13,8 @@ const IMAGE_TYPES = {
 
 export async function POST(request) {
 	if (!(await getSession())) return Response.json({ error: "Unauthorized" }, { status: 401 });
-	if (!process.env.BLOB_READ_WRITE_TOKEN) {
-		return Response.json({ error: "Image uploads need a Vercel Blob store (BLOB_READ_WRITE_TOKEN)" }, { status: 503 });
+	if (!isImageStorageConfigured()) {
+		return Response.json({ error: "Image uploads need Supabase Storage (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)" }, { status: 503 });
 	}
 
 	const contentType = request.headers.get("content-type");

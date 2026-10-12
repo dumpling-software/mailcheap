@@ -20,7 +20,7 @@ const SECURITY_HEADERS = [
 const nextConfig = {
 	poweredByHeader: false,
 	images: {
-		remotePatterns: [{ protocol: "https", hostname: "*.public.blob.vercel-storage.com" }],
+		remotePatterns: [{ protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" }],
 	},
 	async headers() {
 		return [{ source: "/:path*", headers: SECURITY_HEADERS }];
