@@ -3,7 +3,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import AvatarContact from "@/components/AvatarContact";
-import AvatarNewsletter from "@/components/AvatarNewsletter";
 import BadgeStatus from "@/components/BadgeStatus";
 import DialogImportContacts from "@/components/DialogImportContacts";
 import FilterContacts from "@/components/FilterContacts";
@@ -24,10 +23,9 @@ import {
 import { and, count, desc, eq, like } from "drizzle-orm";
 import { contacts as contactsTable, getDb } from "@/lib/db";
 import { formatDate, formatNumber } from "@/lib/format";
-import { toNewsletterMap, toNewsletterOptions } from "@/lib/newsletters";
-import { listNewsletterSummaries } from "@/lib/records";
+import { getCurrentNewsletter } from "@/lib/current-newsletter";
+import { toNewsletterOptions } from "@/lib/newsletters";
 import { cn } from "@/lib/utils";
-import { isUuid } from "@/lib/validation";
 import { CONTACT_STATUSES } from "@/models/Contact";
 
 export const metadata = { title: "Contacts" };
@@ -36,18 +34,25 @@ const PAGE_SIZE = 50;
 
 export default async function ContactsPage({ searchParams }) {
 	const params = await searchParams;
-	const newsletterId = isUuid(params.newsletter) ? params.newsletter : null;
 	const status = CONTACT_STATUSES.includes(params.status) ? params.status : null;
 	const query = typeof params.q === "string" ? params.q.trim().toLowerCase().slice(0, 254) : "";
 	const page = Math.max(1, Number.parseInt(params.page, 10) || 1);
 
+	// The product picked in the sidebar.
 	const db = getDb();
-	const newsletters = await listNewsletterSummaries();
-	const newsletterOptions = toNewsletterOptions(newsletters);
-	const newsletterMap = toNewsletterMap(newsletters);
+	const { current } = await getCurrentNewsletter();
+	if (!current) {
+		return (
+			<>
+				<HeaderPage title="Contacts" />
+				<StateEmpty icon={Users} title="No products yet" />
+			</>
+		);
+	}
+	const newsletterId = current._id;
 
 	const baseFilter = and(
-		newsletterId ? eq(contactsTable.newsletterId, newsletterId) : undefined,
+		eq(contactsTable.newsletterId, newsletterId),
 		query ? like(contactsTable.email, `${escapeLike(query)}%`) : undefined
 	);
 	const filter = and(baseFilter, status ? eq(contactsTable.status, status) : undefined);
@@ -70,7 +75,7 @@ export default async function ContactsPage({ searchParams }) {
 
 	function href(changes) {
 		const next = new URLSearchParams(
-			Object.entries({ newsletter: newsletterId, status, q: query, page }).filter(([, value]) => value)
+			Object.entries({ status, q: query, page }).filter(([, value]) => value)
 		);
 		for (const [key, value] of Object.entries(changes)) {
 			if (value) next.set(key, value);
@@ -83,12 +88,12 @@ export default async function ContactsPage({ searchParams }) {
 	return (
 		<>
 			<HeaderPage title="Contacts">
-				<DialogImportContacts newsletters={newsletterOptions} defaultNewsletterId={newsletterId} />
+				<DialogImportContacts newsletters={toNewsletterOptions([current])} defaultNewsletterId={newsletterId} />
 			</HeaderPage>
 
 			<div className="flex flex-col gap-4">
 				<Suspense fallback={<Skeleton className="h-9 w-full rounded-lg" />}>
-					<FilterContacts newsletters={newsletterOptions} />
+					<FilterContacts />
 				</Suspense>
 
 				<nav
@@ -128,7 +133,6 @@ export default async function ContactsPage({ searchParams }) {
 								<TableRow className="hover:bg-transparent">
 									<TableHead className="pl-4">Email</TableHead>
 									<TableHead>Status</TableHead>
-									{!newsletterId && <TableHead className="hidden md:table-cell">Newsletter</TableHead>}
 									<TableHead className="hidden text-right lg:table-cell">Opens</TableHead>
 									<TableHead className="hidden text-right lg:table-cell">Clicks</TableHead>
 									<TableHead className="hidden text-right sm:table-cell">Added</TableHead>
@@ -153,14 +157,6 @@ export default async function ContactsPage({ searchParams }) {
 										<TableCell>
 											<BadgeStatus status={contact.status} />
 										</TableCell>
-										{!newsletterId && (
-											<TableCell className="hidden text-muted-foreground md:table-cell">
-												<span className="flex items-center gap-2">
-													<AvatarNewsletter newsletter={newsletterMap[contact.newsletterId.toString()]} size={18} />
-													<span className="truncate">{newsletterMap[contact.newsletterId.toString()]?.name}</span>
-												</span>
-											</TableCell>
-										)}
 										<TableCell className="hidden text-right lg:table-cell">
 											{engagement(contact, "opens", "openRate")}
 										</TableCell>

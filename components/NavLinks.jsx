@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Globe, KeyRound, LayoutGrid, Newspaper, Send, Users, Workflow } from "lucide-react";
+import { Globe, KeyRound, LayoutGrid, Send, Settings2, Users, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function NavLinks({ onNavigate }) {
@@ -10,9 +10,14 @@ export default function NavLinks({ onNavigate }) {
 
 	return (
 		<nav className="flex flex-col gap-0.5">
-			{NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-				const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
-				return (
+			{NAV_ITEMS.map(({ href, label, icon: Icon, also = [], heading }) => {
+				const isActive = href === "/" ? pathname === "/" : [href, ...also].some((prefix) => pathname.startsWith(prefix));
+				return [
+					heading && (
+						<p key={heading} className="mt-5 mb-1 px-2.5 text-xs font-medium text-muted-foreground">
+							{heading}
+						</p>
+					),
 					<Link
 						key={href}
 						href={href}
@@ -27,19 +32,20 @@ export default function NavLinks({ onNavigate }) {
 					>
 						<Icon className="size-4" />
 						{label}
-					</Link>
-				);
+					</Link>,
+				];
 			})}
 		</nav>
 	);
 }
 
+// The first five work on the product picked above them; the last two are for the whole account.
 const NAV_ITEMS = [
 	{ href: "/", label: "Overview", icon: LayoutGrid },
 	{ href: "/campaigns", label: "Campaigns", icon: Send },
 	{ href: "/automations", label: "Automations", icon: Workflow },
 	{ href: "/contacts", label: "Contacts", icon: Users },
-	{ href: "/newsletters", label: "Newsletters", icon: Newspaper },
-	{ href: "/domains", label: "Domains", icon: Globe },
+	{ href: "/settings", label: "Settings", icon: Settings2, also: ["/newsletters"] },
+	{ href: "/domains", label: "Domains", icon: Globe, heading: "Account" },
 	{ href: "/api-keys", label: "API keys", icon: KeyRound },
 ];

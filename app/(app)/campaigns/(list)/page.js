@@ -5,13 +5,15 @@ import StateEmpty from "@/components/StateEmpty";
 import TableCampaigns from "@/components/TableCampaigns";
 import { getIssuePageUrl } from "@/lib/archive-data";
 import { findRecentCampaigns } from "@/lib/campaign-queries";
+import { getCurrentNewsletter } from "@/lib/current-newsletter";
 import { toNewsletterMap, toNewsletterOptions } from "@/lib/newsletters";
-import { listNewsletterSummaries } from "@/lib/records";
 
 export const metadata = { title: "Campaigns" };
 
+// The product picked in the sidebar: its campaigns, and New writes one for it.
 export default async function CampaignsPage() {
-	const [campaigns, newsletters] = await Promise.all([findRecentCampaigns(200), listNewsletterSummaries()]);
+	const { newsletters, current } = await getCurrentNewsletter();
+	const campaigns = current ? await findRecentCampaigns(200, current._id) : [];
 	const newslettersById = new Map(newsletters.map((newsletter) => [newsletter._id.toString(), newsletter]));
 	const pageUrls = Object.fromEntries(
 		campaigns
@@ -25,7 +27,7 @@ export default async function CampaignsPage() {
 	return (
 		<>
 			<HeaderPage title="Campaigns">
-				<ButtonNewCampaign newsletters={toNewsletterOptions(newsletters)} />
+				<ButtonNewCampaign newsletters={toNewsletterOptions(current ? [current] : [])} />
 			</HeaderPage>
 
 			{campaigns.length === 0 ? (

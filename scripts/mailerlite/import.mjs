@@ -1,9 +1,13 @@
 // Imports a MailerLite account into Mailcheap: groups as newsletters, subscribers as contacts, sent
 // campaigns with their per-subscriber activity, and automations as drafts.
 //
-//   npm run import:mailerlite -- <stage...|all> [--dry-run] [--refresh]
+//   npm run import:mailerlite -- <stage...|all|sync> [--dry-run] [--refresh]
 //
 // Stages, in order: newsletters, attribution, contacts, campaigns, content, activity, engagement, automations.
+// `sync` is the catch-up run before and after the switch: every stage with fresh API data, bringing over what
+// changed in MailerLite since (new subscribers, unsubscribes, bounces, campaign numbers, new campaigns).
+// MailerLite's responses are cached in .import-cache: without --refresh (implied by sync), a run reads them
+// from there.
 // Needs MAILERLITE_API_KEY and DATABASE_URL (DIRECT_URL works better for long runs), and SUPABASE_URL
 // with SUPABASE_SERVICE_ROLE_KEY to move images off MailerLite. Every write is an upsert keyed on
 // MailerLite's ids, so running a stage again is safe; contacts only ever get stricter statuses, so a
@@ -44,13 +48,14 @@ const MAX_EMAIL_BYTES = 100_000;
 const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
 const requested = args.filter((arg) => !arg.startsWith("--"));
-const stages = requested.includes("all") || requested.length === 0 ? STAGES : requested;
+const isSync = requested.includes("sync");
+const stages = ["all", "sync"].some((name) => requested.includes(name)) || requested.length === 0 ? STAGES : requested;
 for (const stage of stages) if (!STAGES.includes(stage)) throw new Error(`Unknown stage ${stage}. Stages: ${STAGES.join(", ")}, all`);
 
 const ml = createClient({
 	apiKey: process.env.MAILERLITE_API_KEY,
 	cacheDir: path.resolve(".import-cache"),
-	refresh: args.includes("--refresh"),
+	refresh: isSync || args.includes("--refresh"),
 });
 const report = { dryRun: isDryRun, stages, counts: {}, notes: {} };
 const count = (key, amount = 1) => (report.counts[key] = (report.counts[key] ?? 0) + amount);
@@ -335,10 +340,15 @@ async function stageCampaigns() {
 			continue;
 		}
 		const { previewUrl: _p, fromName: _n, fromEmail: _f, replyTo: _r, externalId, ...values } = mapCampaign(campaign);
-		await getDb()
+		const insert = getDb()
 			.insert(campaigns)
-			.values({ ...values, newsletterId: ids[slug], externalSource: SOURCE, externalId })
-			.onConflictDoUpdate({
+			.values({ ...values, newsletterId: ids[slug], externalSource: SOURCE, externalId });
+		// A draft is Mailcheap's to edit once it's here; sent ones only get MailerLite's latest numbers.
+		if (campaign.status !== "sent") {
+			await insert.onConflictDoNothing();
+			continue;
+		}
+		await insert.onConflictDoUpdate({
 				target: [campaigns.externalSource, campaigns.externalId],
 				set: { newsletterId: ids[slug], subject: values.subject, previewText: values.previewText, stats: values.stats, sentAt: values.sentAt, startedAt: values.startedAt, source: values.source },
 			});
@@ -349,6 +359,11 @@ async function stageContent() {
 	const byId = new Map((await listCampaigns()).map((campaign) => [String(campaign.id), campaign]));
 	const rows = isDryRun ? [...byId.values()].filter((campaign) => !classifyCampaign(campaign).skip).map((campaign) => ({ externalId: String(campaign.id), subject: campaign.name })) : await importedCampaigns();
 	for (const row of rows) {
+		// Content is fetched (and its images moved) once: later runs leave it, and any edits, alone.
+		if (row.html || row.markdown) {
+			count("campaign emails already imported");
+			continue;
+		}
 		const campaign = byId.get(row.externalId);
 		const html = await emailHtml(mapCampaign(campaign).previewUrl, row.subject);
 		count("campaign emails converted");
@@ -452,6 +467,9 @@ async function stageEngagement() {
 
 async function stageAutomations() {
 	const ids = isDryRun ? {} : await getNewsletterIds();
+	const existing = isDryRun
+		? new Set()
+		: new Set((await getDb().select({ externalId: automations.externalId }).from(automations).where(eq(automations.externalSource, SOURCE))).map(({ externalId }) => externalId));
 	const list = [];
 	for await (const automation of ml.pages("automations")) list.push(automation);
 	for (const summary of list) {
@@ -462,6 +480,12 @@ async function stageAutomations() {
 			continue;
 		}
 		for (const problem of mapped.problems) note("automation problems", `${automation.name}: ${problem}`);
+		// Already here: it keeps its status and edits, and only gets MailerLite's numbers.
+		if (existing.has(mapped.values.externalId)) {
+			count(`automations updated in ${mapped.slug}`);
+			await getDb().update(automations).set({ stats: mapped.values.stats }).where(and(eq(automations.externalSource, SOURCE), eq(automations.externalId, mapped.values.externalId)));
+			continue;
+		}
 		for (const { nodeId, previewUrl } of mapped.emails) {
 			const html = await emailHtml(previewUrl, `${automation.name} / ${nodeId}`);
 			const node = mapped.values.nodes[nodeId];
@@ -473,11 +497,11 @@ async function stageAutomations() {
 		log(`automation "${automation.name}": ${Object.keys(mapped.values.nodes).length} steps, ${mapped.values.stats.imported.queued} still queued in MailerLite`);
 		if (isDryRun) continue;
 		const { externalId, ...values } = mapped.values;
-		// Imported as drafts; an existing one keeps its status and edits, and only gets MailerLite's numbers.
+		// Imported as drafts.
 		await getDb()
 			.insert(automations)
 			.values({ ...values, newsletterId: ids[mapped.slug], externalSource: SOURCE, externalId })
-			.onConflictDoUpdate({ target: [automations.externalSource, automations.externalId], set: { stats: values.stats } });
+			.onConflictDoNothing();
 	}
 }
 

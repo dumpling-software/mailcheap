@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { Check, CircleAlert, Copy, FlaskConical, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { duplicateCampaign, saveCampaign, sendTestCampaign } from "@/app/(app)/campaigns/actions";
@@ -268,7 +269,15 @@ export default function FormCampaign({
 			<div className="grid gap-4 lg:grid-cols-2 lg:items-start">
 				<div className="overflow-hidden rounded-xl bg-card shadow-border animate-enter">
 					<Row label="From">
-						<span className="truncate text-sm">{from}</span>
+						<span className="flex min-w-0 items-center justify-between gap-3 text-sm">
+							<span className="truncate">{from}</span>
+							<Link
+								href={`/newsletters/${newsletter._id}`}
+								className="shrink-0 text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground"
+							>
+								Product settings
+							</Link>
+						</span>
 					</Row>
 					<Row label="To">
 						<span className="flex min-w-0 items-center gap-2 text-sm">

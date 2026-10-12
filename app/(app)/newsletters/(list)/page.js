@@ -8,14 +8,14 @@ import { hasArchive } from "@/lib/archive-hosts";
 import { listNewslettersWithActiveCounts } from "@/lib/contacts";
 import { formatNumber } from "@/lib/format";
 
-export const metadata = { title: "Newsletters" };
+export const metadata = { title: "Products" };
 
 export default async function NewslettersPage() {
 	const newsletters = await listNewslettersWithActiveCounts();
 
 	return (
 		<>
-			<HeaderPage title="Newsletters">
+			<HeaderPage title="Products">
 				<Button asChild>
 					<Link href="/newsletters/new">
 						<Plus data-icon="inline-start" />
@@ -25,9 +25,9 @@ export default async function NewslettersPage() {
 			</HeaderPage>
 
 			{newsletters.length === 0 ? (
-				<StateEmpty icon={Newspaper} title="No newsletters yet">
+				<StateEmpty icon={Newspaper} title="No products yet">
 					<Button asChild variant="outline">
-						<Link href="/newsletters/new">Create a newsletter</Link>
+						<Link href="/newsletters/new">Add a product</Link>
 					</Button>
 				</StateEmpty>
 			) : (

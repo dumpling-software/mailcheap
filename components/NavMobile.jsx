@@ -5,10 +5,11 @@ import Link from "next/link";
 import { Menu } from "lucide-react";
 import LogoMailcheap from "@/components/LogoMailcheap";
 import NavLinks from "@/components/NavLinks";
+import SwitcherNewsletter from "@/components/SwitcherNewsletter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-export default function NavMobile({ footer }) {
+export default function NavMobile({ footer, switcher }) {
 	const [isOpen, setIsOpen] = useState(false);
 
 	return (
@@ -25,6 +26,9 @@ export default function NavMobile({ footer }) {
 				</SheetTrigger>
 				<SheetContent side="left" className="w-64 gap-0 p-3 pt-14">
 					<SheetTitle className="sr-only">Menu</SheetTitle>
+					<div className="mb-4">
+						<SwitcherNewsletter {...switcher} onNavigate={() => setIsOpen(false)} />
+					</div>
 					<NavLinks onNavigate={() => setIsOpen(false)} />
 					<div className="mt-auto">{footer}</div>
 				</SheetContent>

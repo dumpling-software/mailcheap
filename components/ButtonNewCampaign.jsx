@@ -36,7 +36,7 @@ export default function ButtonNewCampaign({ newsletters, action = createCampaign
 			<Button asChild>
 				<Link href="/newsletters/new">
 					<Plus data-icon="inline-start" />
-					New
+					Add a product
 				</Link>
 			</Button>
 		);

@@ -3,19 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
-import AvatarNewsletter from "@/components/AvatarNewsletter";
 import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 
-const ALL = "all";
-
-export default function FilterContacts({ newsletters }) {
+export default function FilterContacts() {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -26,7 +16,7 @@ export default function FilterContacts({ newsletters }) {
 	function navigate(changes) {
 		const params = new URLSearchParams(searchParams);
 		for (const [key, value] of Object.entries(changes)) {
-			if (value && value !== ALL) params.set(key, value);
+			if (value) params.set(key, value);
 			else params.delete(key);
 		}
 		params.delete("page");
@@ -59,25 +49,6 @@ export default function FilterContacts({ newsletters }) {
 					className="h-9 pl-8"
 				/>
 			</div>
-			<Select
-				value={searchParams.get("newsletter") ?? ALL}
-				onValueChange={(value) => navigate({ newsletter: value })}
-			>
-				<SelectTrigger className="h-9 w-full sm:w-52" aria-label="Newsletter">
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					<SelectItem value={ALL}>All newsletters</SelectItem>
-					{newsletters.map((newsletter) => (
-						<SelectItem key={newsletter.id} value={newsletter.id}>
-							<span className="flex items-center gap-2">
-								<AvatarNewsletter newsletter={newsletter} size={16} />
-								{newsletter.name}
-							</span>
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
 		</div>
 	);
 }

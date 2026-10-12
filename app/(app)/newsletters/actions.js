@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/auth";
 import { CLEANUP_LIMITS } from "@/lib/cleanup";
 import { isSendingEnabled } from "@/lib/config";
 import { getConfirmationProblem } from "@/lib/confirmation-content";
+import { setCurrentNewsletter } from "@/lib/current-newsletter";
 import { eq } from "drizzle-orm";
 import { getDb, isUniqueViolation, newsletters } from "@/lib/db";
 import { MAX_AUTHOR_BIO_LENGTH, MAX_DESCRIPTION_LENGTH } from "@/lib/newsletters";
@@ -137,8 +138,12 @@ export async function saveNewsletter(_state, formData) {
 		throw error;
 	}
 
-	revalidatePath("/newsletters");
+	revalidatePath("/", "layout");
 	revalidateArchive();
-	if (createdId) redirect(`/newsletters/${createdId}`);
+	// A new product becomes the one the dashboard works on.
+	if (createdId) {
+		await setCurrentNewsletter(createdId);
+		redirect("/settings");
+	}
 	return { ok: true, savedAt: Date.now() };
 }
