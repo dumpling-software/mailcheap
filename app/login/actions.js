@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { notifyActivity } from "@/lib/alerts";
 import { isValidLogin, startSession } from "@/lib/auth";
+import { isAccessEnabled } from "@/lib/access";
 import { getConfigProblems } from "@/lib/config";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 
@@ -14,6 +15,7 @@ function safeNextPath(value) {
 }
 
 export async function login(_state, formData) {
+	if (isAccessEnabled()) return { error: "Sign in through Cloudflare Access" };
 	const problems = getConfigProblems();
 	if (problems.length > 0) return { error: `Login is off until the server's settings are fixed. ${problems.join(" ")}` };
 

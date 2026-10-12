@@ -163,6 +163,7 @@ QStash calls `APP_URL/api/jobs/...` to send each batch, so the app has to be rea
 
   This is the safer setup: issue pages show HTML from your editor and from API keys, and on their own domain that HTML never shares the dashboard's origin. Without one, the archive stays on the app domain, where the sanitizer, the sandboxed frame and the Content Security Policy protect it.
 - **Image uploads:** create a public `uploads` bucket in Supabase Storage and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+- **Cloudflare Access:** to sign in through Cloudflare Access instead of the password, proxy the app's domain through Cloudflare and protect it with an Access application. Add a second application with a **Bypass** policy (everyone) for the paths recipients, AWS, QStash and API clients reach without a login: `/unsubscribe`, `/confirm`, `/keep`, `/o/*`, `/c/*`, `/api/unsubscribe`, `/api/views`, `/api/v1/*`, `/api/webhooks/*`, `/api/jobs/*` and `/api/health`. Then set `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` (the protected application's audience tag). Mailcheap checks the token Access adds to every request, so the origin's own URL stays closed, and `ADMIN_PASSWORD` is no longer needed. Turn off Cloudflare's Email Address Obfuscation and Rocket Loader for the domain: their scripts break under Mailcheap's Content Security Policy.
 - **Shared rate limits:** create a Redis database in the [Upstash console](https://console.upstash.com/redis) and add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 - **Alerts:** set `ALERT_FROM` (like `Mailcheap <alerts@mail.example.com>`) to get alerts by email at `ADMIN_EMAIL`: spam complaints, paused sends, signup floods and rate limiter outages, plus every login, new API key and send. Otherwise they only show in the logs.
 
@@ -226,7 +227,8 @@ Drip sequences per newsletter, started by a signup, an app event or a property c
 | `DATABASE_URL` | Yes | Postgres connection string: Supabase's transaction pooler (port 6543) |
 | `DIRECT_URL` | For migrations | Direct Postgres connection (port 5432), used by `npm run db:migrate` |
 | `ADMIN_EMAIL` | Yes | Dashboard login, and where test emails and alerts go |
-| `ADMIN_PASSWORD` | Yes | Dashboard password, 12+ characters. Changing it signs out every session. |
+| `ADMIN_PASSWORD` | Without Access | Dashboard password, 12+ characters. Changing it signs out every session. |
+| `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | No | Sign in through Cloudflare Access instead of the password (see Optional) |
 | `SESSION_SECRET` | Yes | Signs sessions and email links. 32+ random characters. Changing it breaks links in sent emails. |
 | `APP_URL` | On other hosts | Public URL of the app. On Vercel it defaults to the production domain. |
 | `SENDING_ENABLED` | To send | Nothing is sent unless it's `true` |
