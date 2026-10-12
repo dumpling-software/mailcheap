@@ -91,6 +91,9 @@ export const contacts = pgTable(
 		stats: jsonb().notNull().default(CONTACT_STATS),
 		// From an import: engagement on the previous platform ({ emailsReceived, openRate, clickRate }).
 		imported: jsonb(),
+		// What the apps know about the person (plan, name, company...): strings, numbers, booleans and
+		// ISO dates, set through the API (lib/properties.js) and read by automation conditions.
+		properties: jsonb().notNull().default({}),
 		...external(),
 		...timestamps(),
 	},
@@ -103,7 +106,28 @@ export const contacts = pgTable(
 		index("contacts_newsletter_subscribed_idx").on(t.newsletterId, t.subscribedAt.desc(), t._id.desc()),
 		index("contacts_last_chance_idx").on(t.newsletterId, t.lastChanceAt).where(sql`${t.lastChanceAt} is not null`),
 		uniqueIndex("contacts_external_key").on(t.newsletterId, t.externalSource, t.externalId),
+		index("contacts_properties_idx").using("gin", t.properties),
 	]
+);
+
+// Something a contact did in one of our apps (api_key_created, plan_upgraded...), sent to
+// POST /api/v1/events. Automations start from them and wait for them.
+export const contactEvents = pgTable(
+	"contact_events",
+	{
+		_id: id(),
+		newsletterId: uuid()
+			.notNull()
+			.references(() => newsletters._id),
+		contactId: uuid()
+			.notNull()
+			.references(() => contacts._id, { onDelete: "cascade" }),
+		name: text().notNull(),
+		properties: jsonb().notNull().default({}),
+		occurredAt: at("occurred_at").notNull().defaultNow(),
+		...timestamps(),
+	},
+	(t) => [index("contact_events_contact_name_idx").on(t.contactId, t.name, t.occurredAt.desc())]
 );
 
 export const campaigns = pgTable(
@@ -230,6 +254,8 @@ export const apiKeys = pgTable(
 		name: text().notNull(),
 		prefix: text().notNull(),
 		hash: text().notNull(),
+		// A key for one newsletter (one product's app) can't touch the others. Null: every newsletter.
+		newsletterId: uuid().references(() => newsletters._id),
 		lastUsedAt: at("last_used_at"),
 		revokedAt: at("revoked_at"),
 		...timestamps(),

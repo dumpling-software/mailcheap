@@ -45,6 +45,14 @@ test("the app's queries work over the postgres driver", async () => {
 	assert.ok(contact.subscribedAt instanceof Date);
 	assert.equal((await upsertContact({ newsletter, email: "dana@example.com", source: "api" })).created, false);
 
+	const { mergeProperties, eraseContact } = await import("../../lib/contact-events.js");
+	const merged = await mergeProperties(contact._id, { plan: "pro", seats: 2 });
+	assert.deepEqual(merged.after, { plan: "pro", seats: 2 });
+	const removed = await mergeProperties(contact._id, { seats: null });
+	assert.deepEqual(removed.changes, [{ key: "seats", from: 2, to: null }]);
+	await upsertContact({ newsletter, email: "erase@example.com", source: "api" });
+	assert.deepEqual(await eraseContact({ email: "erase@example.com" }), { deleted: 1 });
+
 	const [row] = await listNewslettersWithActiveCounts();
 	assert.equal(row.activeCount, 1);
 

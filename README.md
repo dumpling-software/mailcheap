@@ -220,7 +220,7 @@ A local Postgres works too (`supabase start`, or `docker run -d -p 5432:5432 -e 
 
 ## API
 
-Create a key on the **API keys** page and send it as `Authorization: Bearer <key>`.
+Create a key on the **API keys** page and send it as `Authorization: Bearer <key>`. A key can work with every newsletter or with just one (one product's app); for other newsletters it gets `403`. Every endpoint takes `newsletter` as a slug or an id.
 
 **Add a contact**: `POST /api/v1/contacts`
 
@@ -234,7 +234,19 @@ curl -X POST https://<your-app>/api/v1/contacts \
 - `newsletter` (slug) and `email` are required. `source` labels where the signup came from.
 - `resubscribe: true` brings back someone who unsubscribed (never someone who bounced or complained).
 - Pass your visitor's IP as `ip` to get the per-visitor limit of 5 signups per 10 minutes. Each key is also limited to 600 signups an hour.
-- Answers `201` for a new contact, `200` if it already existed, with `{ id, status, created }`. When the newsletter confirms signups, `status` is `pending` and `inbox` links to the reader's email provider for your "check your inbox" message.
+- `properties` (optional) merges into the contact's: strings (up to 500 characters), numbers and booleans, under names like `plan` or `last_name`. `null` removes one. Automations can branch on them.
+- Answers `201` for a new contact, `200` if it already existed, with `{ id, status, created, properties }`. Signing up again never sends the welcome email again. When the newsletter confirms signups, `status` is `pending` and `inbox` links to the reader's email provider for your "check your inbox" message.
+
+**Record an event**: `POST /api/v1/events` with `newsletter`, `email`, `name` (like `api_key_created`), and optional `properties` and `occurredAt` (ISO date, last 30 days). Creates the contact if the newsletter doesn't have it yet (`source: "api"`), then starts or wakes the automations that wait for it. Answers `201` with `{ id, contactId, contactStatus, created }`.
+
+```bash
+curl -X POST https://<your-app>/api/v1/events \
+  -H "Authorization: Bearer $MAILCHEAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"newsletter":"supadata","email":"jane@example.com","name":"plan_upgraded","properties":{"plan":"pro"}}'
+```
+
+**Erase a contact (GDPR)**: `DELETE /api/v1/contacts` with `{ "email": "..." }` removes the address from every newsletter: its contacts, events, suppression and the address on sent emails (their counts stay in campaign stats). Add `newsletter` to erase from one; a key made for one newsletter always erases there only. Answers `{ deleted }`.
 
 **Create a draft**: `POST /api/v1/campaigns` with `newsletter`, `subject`, `previewText` (optional), `html` or `markdown`, and `archiveSlug` (optional). Answers `201` with the draft's id and dashboard URL. Sending stays a click in the dashboard.
 

@@ -16,8 +16,12 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export default function DialogCreateApiKey() {
+// Radix Select needs a non-empty value; the action reads this one as no newsletter.
+const ALL = "all";
+
+export default function DialogCreateApiKey({ newsletters = [] }) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [formKey, setFormKey] = useState(0);
 
@@ -36,13 +40,13 @@ export default function DialogCreateApiKey() {
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-md">
-				<FormApiKey key={formKey} />
+				<FormApiKey key={formKey} newsletters={newsletters} />
 			</DialogContent>
 		</Dialog>
 	);
 }
 
-function FormApiKey() {
+function FormApiKey({ newsletters }) {
 	const [state, action, isPending] = useActionState(createApiKey, null);
 
 	if (state?.key) {
@@ -69,9 +73,24 @@ function FormApiKey() {
 		<form action={action} className="flex flex-col gap-4">
 			<DialogHeader>
 				<DialogTitle>New API key</DialogTitle>
-				<DialogDescription>Full access to contacts and campaigns.</DialogDescription>
+				<DialogDescription>Access to contacts, events and campaigns, in every newsletter or just one.</DialogDescription>
 			</DialogHeader>
 			<Input name="name" placeholder="Name, e.g. Website signups" required autoFocus maxLength={60} />
+			{newsletters.length > 0 && (
+				<Select name="newsletterId" defaultValue={ALL}>
+					<SelectTrigger className="h-9 w-full" aria-label="Newsletter">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value={ALL}>Every newsletter</SelectItem>
+						{newsletters.map(({ id, name }) => (
+							<SelectItem key={id} value={id}>
+								Only {name}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			)}
 			{state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 			<DialogFooter>
 				<Button type="submit" disabled={isPending} className="min-w-20">

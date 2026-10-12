@@ -14,6 +14,8 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { getAppUrl } from "@/lib/config";
+import { toNewsletterMap, toNewsletterOptions } from "@/lib/newsletters";
+import { listNewsletterSummaries } from "@/lib/records";
 import { desc } from "drizzle-orm";
 import { apiKeys as apiKeysTable, getDb } from "@/lib/db";
 import { formatDate, formatRelative } from "@/lib/format";
@@ -21,23 +23,28 @@ import { formatDate, formatRelative } from "@/lib/format";
 export const metadata = { title: "API keys" };
 
 export default async function ApiKeysPage() {
-	const apiKeys = await getDb()
-		.select({
-			_id: apiKeysTable._id,
-			name: apiKeysTable.name,
-			prefix: apiKeysTable.prefix,
-			lastUsedAt: apiKeysTable.lastUsedAt,
-			revokedAt: apiKeysTable.revokedAt,
-			createdAt: apiKeysTable.createdAt,
-		})
-		.from(apiKeysTable)
-		.orderBy(desc(apiKeysTable.createdAt));
+	const [apiKeys, newsletters] = await Promise.all([
+		getDb()
+			.select({
+				_id: apiKeysTable._id,
+				name: apiKeysTable.name,
+				prefix: apiKeysTable.prefix,
+				newsletterId: apiKeysTable.newsletterId,
+				lastUsedAt: apiKeysTable.lastUsedAt,
+				revokedAt: apiKeysTable.revokedAt,
+				createdAt: apiKeysTable.createdAt,
+			})
+			.from(apiKeysTable)
+			.orderBy(desc(apiKeysTable.createdAt)),
+		listNewsletterSummaries(),
+	]);
+	const newsletterMap = toNewsletterMap(newsletters);
 	const examples = getExamples(getAppUrl());
 
 	return (
 		<>
 			<HeaderPage title="API keys">
-				<DialogCreateApiKey />
+				<DialogCreateApiKey newsletters={toNewsletterOptions(newsletters)} />
 			</HeaderPage>
 
 			<div className="flex flex-col gap-8">
@@ -50,6 +57,7 @@ export default async function ApiKeysPage() {
 								<TableRow className="hover:bg-transparent">
 									<TableHead className="pl-4">Name</TableHead>
 									<TableHead>Key</TableHead>
+									<TableHead className="hidden md:table-cell">Newsletter</TableHead>
 									<TableHead className="hidden sm:table-cell">Created</TableHead>
 									<TableHead className="hidden sm:table-cell">Last used</TableHead>
 									<TableHead className="w-24 pr-2" />
@@ -60,6 +68,9 @@ export default async function ApiKeysPage() {
 									<TableRow key={apiKey._id.toString()}>
 										<TableCell className="py-2.5 pl-4 font-medium">{apiKey.name}</TableCell>
 										<TableCell className="font-mono text-xs text-muted-foreground">{apiKey.prefix}</TableCell>
+										<TableCell className="hidden text-sm text-muted-foreground md:table-cell">
+											{apiKey.newsletterId ? (newsletterMap[apiKey.newsletterId]?.name ?? "Deleted") : "All"}
+										</TableCell>
 										<TableCell className="hidden text-muted-foreground sm:table-cell">
 											{formatDate(apiKey.createdAt)}
 										</TableCell>

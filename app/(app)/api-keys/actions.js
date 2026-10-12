@@ -6,6 +6,7 @@ import { notifyActivity } from "@/lib/alerts";
 import { generateApiKey } from "@/lib/api-keys";
 import { requireSession } from "@/lib/auth";
 import { getAppUrl } from "@/lib/config";
+import { findNewsletter } from "@/lib/records";
 import { and, eq, isNull } from "drizzle-orm";
 import { apiKeys, getDb } from "@/lib/db";
 
@@ -16,9 +17,14 @@ export async function createApiKey(_state, formData) {
 		.slice(0, 60);
 	if (!name) return { error: "Name is required" };
 
+	// Optional: a key for one newsletter, for that product's app.
+	const newsletterId = String(formData.get("newsletterId") ?? "").replace(/^all$/, "");
+	const newsletter = newsletterId ? await findNewsletter(newsletterId) : null;
+	if (newsletterId && !newsletter) return { error: "Newsletter not found" };
+
 	const { key, prefix, hash } = generateApiKey();
-	await getDb().insert(apiKeys).values({ name, prefix, hash });
-	await notifyActivity([`API key created: ${name}`, `${getAppUrl()}/api-keys`]);
+	await getDb().insert(apiKeys).values({ name, prefix, hash, newsletterId: newsletter?._id ?? null });
+	await notifyActivity([`API key created: ${name}${newsletter ? ` (${newsletter.name} only)` : ""}`, `${getAppUrl()}/api-keys`]);
 
 	revalidatePath("/api-keys");
 	return { key };
