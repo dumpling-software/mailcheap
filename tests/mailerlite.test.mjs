@@ -149,3 +149,8 @@ test("MailerLite's own links and Cloudflare's email scrambling come out of the H
 test("merge tags take their default", () => {
 	assert.equal(cleanMailerLiteHtml("<p>Hi {$name|default('there')}, {$company}!</p>").html, "<p>Hi there, !</p>");
 });
+
+test("MailerLite's font stylesheet isn't imported from MailerLite any more", () => {
+	const html = `<style type="text/css">@import url("https://assets.mlcdn.com/fonts-v2.css?version=1758718");</style><p>Hi</p>`;
+	assert.equal(cleanMailerLiteHtml(html).html, `<style type="text/css"></style><p>Hi</p>`);
+});
