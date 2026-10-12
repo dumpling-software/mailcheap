@@ -181,6 +181,10 @@ export const messages = pgTable(
 		seq: bigint({ mode: "number" }).generatedAlwaysAsIdentity(),
 		kind: text().notNull(),
 		campaignId: uuid().references(() => campaigns._id),
+		// Automation emails: the automation, the contact's run through it, and the send node.
+		automationId: uuid().references(() => automations._id),
+		enrollmentId: uuid().references(() => enrollments._id, { onDelete: "set null" }),
+		nodeId: text(),
 		newsletterId: uuid()
 			.notNull()
 			.references(() => newsletters._id),
@@ -208,6 +212,11 @@ export const messages = pgTable(
 		uniqueIndex("messages_last_chance_key")
 			.on(t.campaignId, t.contactId)
 			.where(sql`${t.kind} = 'last-chance'`),
+		// One email per send node per run through an automation, however often a job retries.
+		uniqueIndex("messages_enrollment_node_key")
+			.on(t.enrollmentId, t.nodeId)
+			.where(sql`${t.kind} = 'automation'`),
+		index("messages_automation_node_idx").on(t.automationId, t.nodeId).where(sql`${t.automationId} is not null`),
 		index("messages_ses_message_idx").on(t.sesMessageId).where(sql`${t.sesMessageId} is not null`),
 		index("messages_kind_created_idx").on(t.kind, t.createdAt.desc()),
 		index("messages_newsletter_sent_idx").on(t.newsletterId, t.sentAt),
@@ -274,4 +283,75 @@ export const alerts = pgTable(
 		...timestamps(),
 	},
 	(t) => [uniqueIndex("alerts_key_key").on(t.key)]
+);
+
+// A drip sequence for one newsletter. nodes is a graph keyed by node id, entered at startNodeId:
+// send, wait, wait_until, branch and exit nodes (lib/automations/schema.js).
+export const automations = pgTable(
+	"automations",
+	{
+		_id: id(),
+		newsletterId: uuid()
+			.notNull()
+			.references(() => newsletters._id),
+		name: text().notNull(),
+		// draft: being written. active: enrolls and runs. paused: holds every contact where it is.
+		status: text().notNull().default("draft"),
+		trigger: jsonb().notNull().default({ type: "contact_added" }),
+		// A condition that takes a contact out at any step (e.g. they made their first API call).
+		exitWhen: jsonb(),
+		startNodeId: text().notNull().default("start"),
+		nodes: jsonb().notNull().default({}),
+		// Can a contact go through again once they finished?
+		allowReentry: boolean().notNull().default(false),
+		pausedReason: text(),
+		// Totals from an import (the previous platform's numbers).
+		stats: jsonb().notNull().default({}),
+		...external(),
+		...timestamps(),
+	},
+	(t) => [
+		index("automations_newsletter_status_idx").on(t.newsletterId, t.status),
+		uniqueIndex("automations_external_key").on(t.externalSource, t.externalId),
+	]
+);
+
+// One contact's run through an automation.
+export const enrollments = pgTable(
+	"enrollments",
+	{
+		_id: id(),
+		automationId: uuid()
+			.notNull()
+			.references(() => automations._id),
+		contactId: uuid()
+			.notNull()
+			.references(() => contacts._id, { onDelete: "cascade" }),
+		// active: due to move on. waiting: in a wait or wait_until node. completed: reached the end. exited:
+		// left early (exit condition, unsubscribe, deleted node...), see exitReason.
+		status: text().notNull().default("active"),
+		currentNodeId: text(),
+		nextRunAt: at("next_run_at"),
+		// The wait this run is in: { nodeId, until }.
+		waitFor: jsonb(),
+		// The event that started the run ({ name, properties }), for event_property conditions later on.
+		triggerEvent: jsonb(),
+		// Set while a job or an incoming event moves the run, so two never move it at once.
+		lockedUntil: at("locked_until"),
+		// Visited nodes: [{ nodeId, type, at, outcome }].
+		history: jsonb().notNull().default([]),
+		exitReason: text(),
+		enrolledAt: at("enrolled_at").notNull().defaultNow(),
+		finishedAt: at("finished_at"),
+		...timestamps(),
+	},
+	(t) => [
+		// A contact is in an automation at most once at a time.
+		uniqueIndex("enrollments_live_key")
+			.on(t.automationId, t.contactId)
+			.where(sql`${t.status} in ('active', 'waiting')`),
+		index("enrollments_due_idx").on(t.nextRunAt).where(sql`${t.status} in ('active', 'waiting')`),
+		index("enrollments_contact_idx").on(t.contactId),
+		index("enrollments_automation_status_idx").on(t.automationId, t.status),
+	]
 );

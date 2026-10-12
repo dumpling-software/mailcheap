@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { sendAlert } from "@/lib/alerts";
+import { onContactCreated } from "@/lib/automations/hooks";
 import { isArchiveEnabled, isSendingEnabled } from "@/lib/config";
 import { upsertContact } from "@/lib/contacts";
 import { getInbox } from "@/lib/inbox-links";
@@ -49,6 +50,13 @@ export async function subscribe(_state, formData) {
 		after(() =>
 			queue({ newsletter, contact }).catch((error) =>
 				console.error(`[subscribe] Signup email for ${contact._id} failed:`, error.message)
+			)
+		);
+	}
+	if (created && contact.status === "active") {
+		after(() =>
+			onContactCreated({ newsletter, contact }).catch((error) =>
+				console.error(`[subscribe] Automations for ${contact._id} failed:`, error.message)
 			)
 		);
 	}
