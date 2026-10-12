@@ -125,3 +125,44 @@ test("a send, its SES events, an import and an alert work over the postgres driv
 
 	await sendAlert({ key: "driver", title: "Driver", detail: "works" });
 });
+
+test("automations run over the postgres driver", async () => {
+	process.env.SENDING_ENABLED = "true";
+	const { setSesClient } = await import("../../lib/ses.js");
+	setSesClient(fakeSes());
+	const { onEvent } = await import("../../lib/automations/hooks.js");
+	const { runDue } = await import("../../lib/automations/run.js");
+	const { recordEvent } = await import("../../lib/contact-events.js");
+	const { upsertContact } = await import("../../lib/contacts.js");
+	const { automations, enrollments, newsletters } = await import("../../lib/db.js");
+	const { eq } = await import("drizzle-orm");
+
+	const [newsletter] = await getDb()
+		.insert(newsletters)
+		.values({ name: "Onboarding", slug: "onboarding", fromEmail: "news@example.com", postalAddress: "1 Main St" })
+		.returning();
+	const [automation] = await getDb()
+		.insert(automations)
+		.values({
+			newsletterId: newsletter._id,
+			name: "Nudge",
+			status: "active",
+			trigger: { type: "event", name: "signed_up" },
+			nodes: {
+				start: { type: "send", subject: "Welcome", markdown: "Hi", next: "wait" },
+				wait: { type: "wait", duration: "1d", next: "again" },
+				again: { type: "send", subject: "Day two", markdown: "Hi again" },
+			},
+		})
+		.returning();
+	const { contact } = await upsertContact({ newsletter, email: "auto@example.com", source: "api" });
+	await onEvent({ newsletter, contact, event: await recordEvent({ newsletter, contact, name: "signed_up" }) });
+	const [waiting] = await getDb().select().from(enrollments).where(eq(enrollments.automationId, automation._id));
+	assert.equal(waiting.status, "waiting");
+	assert.ok(waiting.nextRunAt instanceof Date);
+	assert.equal(waiting.history.length, 1);
+
+	await runDue({ now: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) });
+	const [done] = await getDb().select().from(enrollments).where(eq(enrollments.automationId, automation._id));
+	assert.equal(done.status, "completed");
+});

@@ -146,6 +146,8 @@ The **Domains** page in Mailcheap now shows your domain with its DKIM and MAIL F
 1. In the [Upstash console](https://console.upstash.com/qstash), open QStash and copy `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY` and `QSTASH_NEXT_SIGNING_KEY` (and `QSTASH_URL` if you picked a region other than the default).
 2. Add them in Vercel and redeploy.
 
+3. For automations, add a schedule that moves runs whose wait is over, every 5 minutes: in **QStash > Schedules**, create one with destination `https://<your-app>/api/jobs/automations`, method POST and cron `*/5 * * * *`. Or: `curl -X POST "https://qstash.upstash.io/v2/schedules/https://<your-app>/api/jobs/automations" -H "Authorization: Bearer $QSTASH_TOKEN" -H "Upstash-Cron: */5 * * * *"`.
+
 QStash calls `APP_URL/api/jobs/...` to send each batch, so the app has to be reachable on the internet. Mailcheap checks QStash's signature on every job.
 
 ### 5. Turn sending on
@@ -180,6 +182,31 @@ A local Postgres works too (`supabase start`, or `docker run -d -p 5432:5432 -e 
 - QStash can't reach `localhost`. To try a full send locally, run the QStash dev server (`npx @upstash/qstash-cli dev`) and use the URL, token and signing keys it prints.
 - `npm test` runs the unit tests, then the database tests against an in-memory Postgres ([PGlite](https://pglite.dev), no setup needed). `npm run lint` runs ESLint.
 - Schema changes: edit `db/schema.js`, run `npm run db:generate`, and commit the new file in `db/migrations`.
+
+## Automations
+
+Drip sequences per newsletter, started by a signup, an app event or a property change, written as a small graph of nodes (the **Automations** page edits them as a list or as JSON):
+
+```json
+{
+  "trigger": { "type": "event", "name": "api_key_created" },
+  "exitWhen": { "has_event": "first_api_call" },
+  "nodes": {
+    "start": { "type": "wait_until", "condition": { "has_event": "first_api_call" }, "timeout": "7d", "met": "end", "timeout_next": "help" },
+    "help": { "type": "send", "subject": "Need a hand getting started?", "markdown": "Hi! ...", "next": "wait2" },
+    "wait2": { "type": "wait", "duration": "4d", "next": "check" },
+    "check": { "type": "branch", "condition": { "not_has_event": "first_api_call" }, "yes": "help2", "no": "end" },
+    "help2": { "type": "send", "subject": "Quick question", "markdown": "...", "next": "end" },
+    "end": { "type": "exit" }
+  }
+}
+```
+
+- **Triggers:** `contact_added` (a new active contact, or a confirmation), `event` (`name`), `property_changed` (`property`, optional `to`). Any trigger takes a `condition`.
+- **Nodes:** `send` (Markdown or HTML), `wait` (`30m`, `12h`, `4d`, `2w`), `wait_until` (a condition, or a timeout), `branch`, `exit`.
+- **Conditions:** `{ "property": "plan", "eq": "pro" }` (also `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `exists`), `{ "has_event": "x", "within_days": 7 }`, `{ "not_has_event": "x" }`, `{ "clicked": { "node": "help" } }` or `{ "campaign": "<id>" }`, `{ "opened": ... }` (unreliable: Apple Mail opens everything), `{ "status": "active" }`, `{ "source": "api" }`, `{ "signup_age_days": { "gte": 7 } }`, combined with `all`, `any` and `not`.
+- A contact goes through an automation once, unless it allows re-entry. Before every step Mailcheap checks `exitWhen` and that the contact is still subscribed; unsubscribes, bounces and complaints end the run. Each send node sends at most once per run, however often a job retries.
+- Events and property changes move waiting runs right away; the 5-minute QStash schedule moves the rest. An automation pauses itself when its bounce or complaint rate passes the campaign limits.
 
 ## Deliverability basics
 

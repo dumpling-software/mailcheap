@@ -36,6 +36,13 @@
       "when": 1791806161514,
       "tag": "0004_properties_events_scoped_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791806779408,
+      "tag": "0005_automations",
+      "breakpoints": true
     }
   ]
 }
