@@ -15,6 +15,20 @@
       "when": 1791804917007,
       "tag": "0001_updated_at_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791805969577,
+      "tag": "0002_contact_complained_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791805971896,
+      "tag": "0003_bounce_only_suppressions",
+      "breakpoints": true
     }
   ]
 }

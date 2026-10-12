@@ -110,7 +110,7 @@ Use one AWS region for everything below (the examples use `us-east-1`).
 2. **Set a custom MAIL FROM domain.** On the identity, open **Custom MAIL FROM domain > Edit**, use `bounce.mail.example.com`, and add the MX and TXT records SES shows. This aligns SPF with your domain.
 3. **Add DMARC** if your root domain doesn't have one: a TXT record at `_dmarc.example.com` with `v=DMARC1; p=none;` to start. Gmail and Yahoo require DMARC from bulk senders.
 4. **Request production access.** New accounts are in the sandbox (200 emails a day, verified recipients only). In **Account dashboard > Request production access**, pick Marketing, and explain that readers opt in, that bounces and complaints are suppressed automatically, and that every email has one-click unsubscribe. AWS usually answers within a day.
-5. **Create a configuration set**, named `mailcheap` for example, under **Configuration sets**. Leave SES open and click tracking off: Mailcheap tracks on your own domain.
+5. **Create a configuration set**, named `mailcheap` for example, under **Configuration sets**. Leave SES open and click tracking off: Mailcheap tracks on your own domain. Then make SES suppress only bounces for it, since Mailcheap keeps spam complaints per newsletter (SES's default list would block a complainer from all of them): `aws sesv2 put-configuration-set-suppression-options --configuration-set-name mailcheap --suppressed-reasons BOUNCE`.
 6. **Create an SNS topic.** In the SNS console, create a standard topic, like `mailcheap-ses-events`, and copy its ARN. Then switch it to signature version 2, which signs messages with SHA256 instead of SHA1: `aws sns set-topic-attributes --topic-arn <topic-arn> --attribute-name SignatureVersion --attribute-value 2`.
 7. **Send SES events to the topic.** In the configuration set, open **Event destinations > Add destination**. Select hard bounces, complaints, deliveries, delivery delays, rejects and rendering failures, then pick Amazon SNS and your topic.
 8. **Create an IAM user for Mailcheap** with this policy, then create an access key for it:
@@ -129,7 +129,7 @@ Use one AWS region for everything below (the examples use `us-east-1`).
     },
     {
       "Effect": "Allow",
-      "Action": ["ses:GetAccount", "ses:ListEmailIdentities", "ses:GetEmailIdentity"],
+      "Action": ["ses:GetAccount", "ses:ListEmailIdentities", "ses:GetEmailIdentity", "ses:GetConfigurationSet"],
       "Resource": "*"
     }
   ]
@@ -139,7 +139,7 @@ Use one AWS region for everything below (the examples use `us-east-1`).
 9. **Add the variables in Vercel** and redeploy: `SES_REGION`, `SES_ACCESS_KEY_ID`, `SES_SECRET_ACCESS_KEY`, `SES_CONFIGURATION_SET` and `SES_SNS_TOPIC_ARN`.
 10. **Subscribe Mailcheap to the topic.** In the SNS topic, **Create subscription** with protocol HTTPS and endpoint `https://<your-app>/api/webhooks/ses`. Leave raw message delivery off. Mailcheap confirms the subscription by itself; refresh and the status turns to Confirmed.
 
-The **Domains** page in Mailcheap now shows your domain with its DKIM and MAIL FROM status. Optional: in SES **Account dashboard > Suppression list**, turn on the account-level list for bounces and complaints too.
+The **Domains** page in Mailcheap now shows your domain with its DKIM and MAIL FROM status, and warns if SES would still block complainers from every newsletter.
 
 ### 4. QStash
 
@@ -245,7 +245,7 @@ curl -X POST https://<your-app>/api/v1/contacts \
 - Next.js App Router, JavaScript, Tailwind CSS with shadcn/ui, Postgres (Supabase) through Drizzle ORM.
 - **Send** picks the audience (active contacts, suppressions left out, most engaged first), creates one message per reader, and queues one QStash job per batch of 50. Each job sends through the SES v2 API at `SEND_RATE_PER_SECOND` and pauses the campaign if bounce or complaint rates pass the limits.
 - Welcome and confirmation emails go out right away, capped at 100 every 10 minutes per newsletter.
-- SES publishes events to SNS, which posts them to `/api/webhooks/ses`. Mailcheap verifies the SNS signature, updates the message, the campaign stats and the contact, and suppresses bounced and complaining addresses for every newsletter.
+- SES publishes events to SNS, which posts them to `/api/webhooks/ses`. Mailcheap verifies the SNS signature and updates the message, the campaign stats and the contact. A hard bounce suppresses the address for every newsletter; unsubscribes and spam complaints only stop the newsletter they came from.
 - Opens and clicks go through `/o/...` and `/c/...` on your app's domain. Clicks within 30 seconds of the send, or from known link scanners, don't count.
 - Archive pages are static and refresh when you send or save.
 
