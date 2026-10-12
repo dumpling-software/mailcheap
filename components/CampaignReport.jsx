@@ -25,7 +25,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { getArchiveUrls } from "@/lib/archive-hosts";
+import { getArchiveUrls, hasArchive } from "@/lib/archive-hosts";
 import { LIMITS, isSendingEnabled } from "@/lib/config";
 import { formatDate, formatNumber, formatRate } from "@/lib/format";
 import { rateTone } from "@/lib/health";
@@ -35,7 +35,7 @@ import { UNSUBSCRIBE_PLACEHOLDER, renderEmail, withResponsiveImages } from "@/li
 export default function CampaignReport({ campaign, newsletter, providers, remainingCount = 0 }) {
 	const { stats } = campaign;
 	const id = campaign._id.toString();
-	const isOnArchive = newsletter.archiveEnabled && Boolean(campaign.archiveSlug) && campaign.archiveListed !== false;
+	const isOnArchive = hasArchive(newsletter) && Boolean(campaign.archiveSlug) && campaign.archiveListed !== false;
 	const reached = stats.delivered || stats.sent;
 	const progress = stats.recipients ? Math.min(stats.sent / stats.recipients, 1) : 0;
 	const { html } = renderEmail({
@@ -204,7 +204,7 @@ export default function CampaignReport({ campaign, newsletter, providers, remain
 					</div>
 				)}
 
-				{newsletter.archiveEnabled && campaign.archiveSlug && (
+				{hasArchive(newsletter) && campaign.archiveSlug && (
 					<div
 						style={{ "--stagger": 3 }}
 						className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-x-2 rounded-xl bg-card px-4 shadow-border transition-colors duration-150 animate-enter focus-within:bg-muted/40"

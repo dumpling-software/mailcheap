@@ -4,7 +4,7 @@ import AvatarNewsletter from "@/components/AvatarNewsletter";
 import FormNewsletter from "@/components/FormNewsletter";
 import HeaderPage from "@/components/HeaderPage";
 import { cleanupTotalsPipeline } from "@/lib/cleanup";
-import { isSendingEnabled } from "@/lib/config";
+import { isArchiveEnabled, isSendingEnabled } from "@/lib/config";
 import { connectDb } from "@/lib/db";
 import { serialize } from "@/lib/serialize";
 import { listSesDomains } from "@/lib/ses";
@@ -41,6 +41,7 @@ export default async function NewsletterPage({ params }) {
 				newsletter={newsletter ? serialize(newsletter) : null}
 				verifiedDomains={verifiedDomains}
 				isSendingEnabled={isSendingEnabled()}
+				isArchiveAvailable={isArchiveEnabled()}
 				testEmail={process.env.ADMIN_EMAIL}
 				cleanupTotals={cleanupTotals}
 			/>

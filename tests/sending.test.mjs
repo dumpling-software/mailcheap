@@ -74,7 +74,9 @@ test("custom HTML keeps its own unsubscribe link, filled in per recipient", () =
 	assert.equal(email.replyTo, "hello@example.net");
 });
 
-test("issues link to their archive page; drafts to the one their subject gives", () => {
+test("issues link to their archive page; drafts to the one their subject gives", (t) => {
+	process.env.ARCHIVE_ENABLED = "true";
+	t.after(() => delete process.env.ARCHIVE_ENABLED);
 	const archived = { ...newsletter, slug: "weekly", archiveEnabled: true };
 	const issue = { ...campaign, _id: "84f1a2b3c4d5e6f7a8b9c0d3", archiveSlug: "issue-12-is-out" };
 
@@ -89,6 +91,16 @@ test("issues link to their archive page; drafts to the one their subject gives",
 	assert.equal(getIssueWebUrl({ campaign: { ...issue, archiveListed: false }, newsletter: archived }), null);
 	const welcome = getWelcomeContent({ welcome: { enabled: true, subject: "Welcome", markdown: "Hi" } });
 	assert.equal(getIssueWebUrl({ campaign: welcome, newsletter: archived }), null, "welcome email");
+});
+
+test("with archives off for the install, no email links to an archive page", () => {
+	delete process.env.ARCHIVE_ENABLED;
+	const archived = { ...newsletter, slug: "weekly", archiveEnabled: true };
+	const issue = { ...campaign, _id: "84f1a2b3c4d5e6f7a8b9c0d3", archiveSlug: "issue-12-is-out" };
+	assert.equal(getIssueWebUrl({ campaign: issue, newsletter: archived }), null);
+	const sent = buildRecipientEmail({ campaign: issue, newsletter: archived, contact });
+	assert.ok(!sent.html.includes("/archive/"));
+	assert.ok(!sent.text.startsWith("Read online"));
 });
 
 test("each step reaches the most engaged contacts up to what was sent plus the step", () => {

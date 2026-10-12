@@ -2,7 +2,7 @@ import { isValidObjectId } from "mongoose";
 import { notFound } from "next/navigation";
 import CampaignReport from "@/components/CampaignReport";
 import FormCampaign from "@/components/FormCampaign";
-import { getArchiveUrls } from "@/lib/archive-hosts";
+import { getArchiveUrls, hasArchive } from "@/lib/archive-hosts";
 import { sendTimesPipeline } from "@/lib/campaign-queries";
 import { isSendingEnabled } from "@/lib/config";
 import { connectDb } from "@/lib/db";
@@ -59,7 +59,7 @@ export default async function CampaignPage({ params }) {
 			isSendingEnabled={isSendingEnabled()}
 			testEmail={process.env.ADMIN_EMAIL}
 			sendTimes={sendTimes}
-			archiveUrlBase={newsletter.archiveEnabled ? getArchiveUrls(newsletter).absolutePost("") : null}
+			archiveUrlBase={hasArchive(newsletter) ? getArchiveUrls(newsletter).absolutePost("") : null}
 		/>
 	);
 }

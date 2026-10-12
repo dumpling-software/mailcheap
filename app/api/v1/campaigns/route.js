@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/api-keys";
 import { listPublishedIssues } from "@/lib/archive-data";
-import { getArchiveUrls } from "@/lib/archive-hosts";
+import { getArchiveUrls, hasArchive } from "@/lib/archive-hosts";
 import { uniqueArchiveSlug } from "@/lib/archive-slugs";
 import { getAppUrl } from "@/lib/config";
 import { connectDb } from "@/lib/db";
@@ -79,7 +79,7 @@ export async function GET(request) {
 	if (!newsletter) return fail(404, "Newsletter not found");
 
 	const issues = await listPublishedIssues(newsletter._id);
-	const urls = newsletter.archiveEnabled ? getArchiveUrls(newsletter) : null;
+	const urls = hasArchive(newsletter) ? getArchiveUrls(newsletter) : null;
 	return NextResponse.json({
 		issues: issues.map(({ _id, subject, previewText, archiveSlug, sentAt, startedAt }) => ({
 			id: String(_id),

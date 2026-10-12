@@ -118,10 +118,11 @@ export async function saveNewsletter(_state, formData) {
 	const error = validateNewsletter(values);
 	if (error) return { error };
 	// A collapsed email section sends no fields, and what it had saved stays as it is.
-	const { welcome, confirmation, ...rest } = values;
+	// So does the archive section while archives are off for the install.
+	const { welcome, confirmation, archiveEnabled, description, author, socialLinks, ...rest } = values;
 	const document = {
 		...rest,
-		socialLinks: values.socialLinks.links,
+		...(formData.has("description") && { archiveEnabled, description, author, socialLinks: socialLinks.links }),
 		...(formData.has("welcomeSubject") && { welcome }),
 		...(formData.has("confirmationSubject") && { confirmation }),
 	};

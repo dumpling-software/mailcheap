@@ -41,7 +41,7 @@ Mailcheap is the rest of what a newsletter needs, in one small Next.js app: an e
 
 **Publish and measure**
 
-- A public archive for each newsletter: issue pages, author page, share images, sitemap. Optional custom domain.
+- A public archive for each newsletter: issue pages, author page, share images, sitemap. Optional custom domain. Off for the whole install unless `ARCHIVE_ENABLED=true`.
 - Overview with subscribers over time, emails per hour, and delivery, open, click, bounce and complaint rates.
 - Campaign reports by mailbox provider (Gmail, Outlook, Yahoo, iCloud...).
 - Contacts with search, status filters and CSV import from any platform.
@@ -154,6 +154,7 @@ QStash calls `APP_URL/api/jobs/...` to send each batch, so the app has to be rea
 
 ### Optional
 
+- **Public archive:** off by default. Set `ARCHIVE_ENABLED=true` to serve `/archive/<newsletter-slug>` and `/p/<issue>`, add "Read online" links to emails, and show each newsletter's archive switch.
 - **Archive on its own domain:** add the domain to your Vercel project, then set `ARCHIVE_HOSTS=news.example.com=<newsletter-slug>` and redeploy. That domain serves only the archive and the unsubscribe page, never the dashboard, and the app domain's `/archive/<newsletter-slug>` pages redirect there.
 
   This is the safer setup: issue pages show HTML from your editor and from API keys, and on their own domain that HTML never shares the dashboard's origin. Without one, the archive stays on the app domain, where the sanitizer, the sandboxed frame and the Content Security Policy protect it.

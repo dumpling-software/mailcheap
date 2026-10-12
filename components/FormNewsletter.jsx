@@ -21,7 +21,14 @@ import { cn } from "@/lib/utils";
 
 const IMAGE_PREVIEW_PATTERN = /^(https:\/\/\S+\.\S{2,}\/\S+|\/\S+\.\w{3,4})$/;
 
-export default function FormNewsletter({ newsletter, verifiedDomains, isSendingEnabled, testEmail, cleanupTotals }) {
+export default function FormNewsletter({
+	newsletter,
+	verifiedDomains,
+	isSendingEnabled,
+	isArchiveAvailable,
+	testEmail,
+	cleanupTotals,
+}) {
 	const [state, action, isPending] = useActionState(saveNewsletter, null);
 	const [isTesting, startTesting] = useTransition();
 	const [name, setName] = useState(newsletter?.name ?? "");
@@ -372,70 +379,72 @@ export default function FormNewsletter({ newsletter, verifiedDomains, isSendingE
 				)}
 			</Section>
 
-			<Section
-				title="Public archive"
-				stagger={5}
-				action={
-					<div className="flex items-center gap-3">
-						{newsletter?.archiveEnabled && (
-							<a
-								href={`/archive/${newsletter.slug}`}
-								target="_blank"
-								rel="noreferrer"
-								className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground"
-							>
-								View
-								<ExternalLink className="size-3" />
-							</a>
-						)}
-						<Switch
-							name="archiveEnabled"
-							checked={isArchiveEnabled}
-							onCheckedChange={setIsArchiveEnabled}
-							aria-label="Public archive"
+			{isArchiveAvailable && (
+				<Section
+					title="Public archive"
+					stagger={5}
+					action={
+						<div className="flex items-center gap-3">
+							{newsletter?.archiveEnabled && (
+								<a
+									href={`/archive/${newsletter.slug}`}
+									target="_blank"
+									rel="noreferrer"
+									className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground"
+								>
+									View
+									<ExternalLink className="size-3" />
+								</a>
+							)}
+							<Switch
+								name="archiveEnabled"
+								checked={isArchiveEnabled}
+								onCheckedChange={setIsArchiveEnabled}
+								aria-label="Public archive"
+							/>
+						</div>
+					}
+				>
+					<p className="px-4 py-3 text-sm text-pretty text-muted-foreground">
+						Sent issues get a page at /archive/{slug || "slug"}, with a signup form. To serve it on its own domain, add
+						the domain to ARCHIVE_HOSTS.
+					</p>
+					<Field label="Description" hint="One sentence under the name and in the subscribe popup">
+						<Textarea
+							name="description"
+							defaultValue={newsletter?.description}
+							rows={2}
+							maxLength={MAX_DESCRIPTION_LENGTH}
+							placeholder="One idea about building things, every Sunday."
 						/>
-					</div>
-				}
-			>
-				<p className="px-4 py-3 text-sm text-pretty text-muted-foreground">
-					Sent issues get a page at /archive/{slug || "slug"}, with a signup form. To serve it on its own domain, add
-					the domain to ARCHIVE_HOSTS.
-				</p>
-				<Field label="Description" hint="One sentence under the name and in the subscribe popup">
-					<Textarea
-						name="description"
-						defaultValue={newsletter?.description}
-						rows={2}
-						maxLength={MAX_DESCRIPTION_LENGTH}
-						placeholder="One idea about building things, every Sunday."
-					/>
-				</Field>
-				<Field label="Author bio" hint="Under your name on the author page">
-					<Input
-						name="authorBio"
-						defaultValue={newsletter?.author?.bio}
-						maxLength={MAX_AUTHOR_BIO_LENGTH}
-						placeholder="I write about building small software companies."
-					/>
-				</Field>
-				<Field label="Author photo" hint="An https:// link or a path like /authors/jane.jpg. The newsletter image otherwise.">
-					<Input
-						name="authorImageUrl"
-						defaultValue={newsletter?.author?.imageUrl}
-						placeholder="https://example.com/jane.jpg"
-						className="font-mono"
-					/>
-				</Field>
-				<Field label="Social links" hint="One link per line">
-					<Textarea
-						name="socialLinks"
-						defaultValue={newsletter?.socialLinks?.join("\n")}
-						rows={3}
-						placeholder={"https://x.com/example\nhttps://youtube.com/@example"}
-						className="font-mono text-[13px] leading-6"
-					/>
-				</Field>
-			</Section>
+					</Field>
+					<Field label="Author bio" hint="Under your name on the author page">
+						<Input
+							name="authorBio"
+							defaultValue={newsletter?.author?.bio}
+							maxLength={MAX_AUTHOR_BIO_LENGTH}
+							placeholder="I write about building small software companies."
+						/>
+					</Field>
+					<Field label="Author photo" hint="An https:// link or a path like /authors/jane.jpg. The newsletter image otherwise.">
+						<Input
+							name="authorImageUrl"
+							defaultValue={newsletter?.author?.imageUrl}
+							placeholder="https://example.com/jane.jpg"
+							className="font-mono"
+						/>
+					</Field>
+					<Field label="Social links" hint="One link per line">
+						<Textarea
+							name="socialLinks"
+							defaultValue={newsletter?.socialLinks?.join("\n")}
+							rows={3}
+							placeholder={"https://x.com/example\nhttps://youtube.com/@example"}
+							className="font-mono text-[13px] leading-6"
+						/>
+					</Field>
+				</Section>
+			)}
 
 			<div className="sticky bottom-0 -mx-4 mt-2 flex justify-end bg-background/80 px-4 py-3 backdrop-blur-md md:-mx-10 md:px-10">
 				<Button type="submit" disabled={isPending} className="min-w-20">
