@@ -8,7 +8,7 @@ import SkeletonDomains from "@/components/SkeletonDomains";
 import StateEmpty from "@/components/StateEmpty";
 import { Button } from "@/components/ui/button";
 import { rootDomain } from "@/lib/favicon";
-import { listSesDomains } from "@/lib/ses";
+import { getSesSuppression, listSesDomains } from "@/lib/ses";
 
 export const metadata = { title: "Domains" };
 
@@ -36,10 +36,35 @@ export default function DomainsPage() {
 					</a>
 				</Button>
 			</HeaderPage>
+			<Suspense fallback={null}>
+				<NoticeSuppression />
+			</Suspense>
 			<Suspense fallback={<SkeletonDomains />}>
 				<ListDomains />
 			</Suspense>
 		</>
+	);
+}
+
+// Spam complaints are per newsletter here; SES's own suppression list would make them global.
+async function NoticeSuppression() {
+	const suppression = await getSesSuppression({ fresh: true });
+	if (suppression.error || !suppression.blocksComplaints) return null;
+	const name = process.env.SES_CONFIGURATION_SET || "<configuration set>";
+	return (
+		<div className="mb-6 flex gap-3 rounded-xl bg-amber-500/10 p-4 text-sm text-pretty text-amber-900 shadow-border animate-enter dark:text-amber-200">
+			<TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+			<div className="flex flex-col gap-1.5">
+				<p className="font-medium">SES blocks spam complainers from every newsletter</p>
+				<p>
+					The {suppression.source} suppression list includes complaints, so someone who marks one newsletter as spam
+					stops getting all of them. Mailcheap handles complaints per newsletter: keep only bounces in SES with{" "}
+					<code className="font-mono text-xs">
+						aws sesv2 put-configuration-set-suppression-options --configuration-set-name {name} --suppressed-reasons BOUNCE
+					</code>
+				</p>
+			</div>
+		</div>
 	);
 }
 

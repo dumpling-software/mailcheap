@@ -78,6 +78,8 @@ export const contacts = pgTable(
 		subscribedAt: at("subscribed_at").defaultNow(),
 		confirmedAt: at("confirmed_at"),
 		unsubscribedAt: at("unsubscribed_at"),
+		// A spam complaint about this newsletter's email: status complained, for this newsletter only.
+		complainedAt: at("complained_at"),
 		lastSentAt: at("last_sent_at"),
 		lastOpenAt: at("last_open_at"),
 		lastClickAt: at("last_click_at"),
@@ -207,7 +209,8 @@ export const events = pgTable(
 	(t) => [index("events_campaign_type_idx").on(t.campaignId, t.type), index("events_ses_message_idx").on(t.sesMessageId)]
 );
 
-// Global: an address listed here is never emailed again from any newsletter.
+// Global: an address listed here is never emailed again from any newsletter. Only hard bounces (the
+// address doesn't exist) and manual blocks: unsubscribes and spam complaints are per newsletter.
 export const suppressions = pgTable(
 	"suppressions",
 	{

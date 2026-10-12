@@ -89,7 +89,7 @@ test("soft bounces only record the reason", () => {
 	}
 });
 
-test("complaints suppress the address and outrank an earlier bounce", () => {
+test("complaints stop the newsletter that sent the email, not every newsletter", () => {
 	const plan = getSesEventPlan(
 		sesEvent("Complaint", {
 			complainedRecipients: [{ emailAddress: "reader@example.com" }],
@@ -100,14 +100,14 @@ test("complaints suppress the address and outrank an earlier bounce", () => {
 	assert.deepEqual(plan.firsts, [{ field: "complainedAt", stat: "complained" }]);
 	assert.equal(plan.status.to, "complained");
 	assert.ok(plan.status.from.includes("bounced"));
-	assert.equal(plan.suppression.reason, "complaint");
-	assert.equal(plan.suppression.detail, "abuse");
-	assert.equal(plan.suppression.contactStatus, "complained");
-	assert.ok(plan.suppression.contactStatusFrom.includes("bounced"));
-	assert.ok(!plan.suppression.contactStatusFrom.includes("complained"));
+	assert.equal(plan.suppression, null, "no global suppression");
+	assert.deepEqual(plan.complaint.emails, ["reader@example.com"]);
+	assert.equal(plan.complaint.detail, "abuse");
+	assert.ok(plan.complaint.contactStatusFrom.includes("unsubscribed"));
+	assert.ok(!plan.complaint.contactStatusFrom.includes("complained"));
 
 	const withoutRecipients = getSesEventPlan(sesEvent("Complaint", {}));
-	assert.deepEqual(withoutRecipients.suppression.emails, ["reader@example.com"]);
+	assert.deepEqual(withoutRecipients.complaint.emails, ["reader@example.com"]);
 });
 
 test("not-spam feedback is not a complaint", () => {
@@ -120,6 +120,7 @@ test("not-spam feedback is not a complaint", () => {
 	assert.deepEqual(plan.firsts, []);
 	assert.equal(plan.status, null);
 	assert.equal(plan.suppression, null);
+	assert.equal(plan.complaint, null);
 });
 
 test("opens update engagement and count once per message", () => {

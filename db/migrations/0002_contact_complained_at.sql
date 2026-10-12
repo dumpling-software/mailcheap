@@ -1,0 +1,1 @@
+ALTER TABLE "contacts" ADD COLUMN "complained_at" timestamp with time zone;
