@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getArchiveHostUrl, getArchiveSlugForHost } from "@/lib/archive-hosts";
+import { isArchiveEnabled } from "@/lib/config";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session-token";
 
 // Reachable without a session: recipients, mail providers, AWS, QStash, and API-key clients.
@@ -11,14 +12,15 @@ const PUBLIC_PATHS = [
 	/^\/keep$/,
 	/^\/o\//,
 	/^\/c\//,
-	/^\/p\//,
-	/^\/archive\//,
 	/^\/api\/unsubscribe$/,
 	/^\/api\/views$/,
 	/^\/api\/v1\//,
 	/^\/api\/webhooks\//,
 	/^\/api\/jobs\//,
 ];
+
+// Archive pages are public only while archives are on (ARCHIVE_ENABLED).
+const ARCHIVE_PATHS = [/^\/p\//, /^\/archive\//];
 
 // A public archive domain never exposes the dashboard, not even its login page.
 const ARCHIVE_HOST_PATHS = [/^\/unsubscribe$/, /^\/api\/unsubscribe$/, /^\/api\/views$/];
@@ -35,8 +37,13 @@ function rewriteTo(request, pathname) {
 
 export async function proxy(request) {
 	const { pathname } = request.nextUrl;
+	const isArchiveOn = isArchiveEnabled();
+	const isArchivePath = ARCHIVE_PATHS.some((pattern) => pattern.test(pathname));
 
-	const archiveSlug = getArchiveSlugForHost(request.headers.get("host"));
+	// With archives off they don't exist: no issue pages, no archive domains, no redirects.
+	if (!isArchiveOn && isArchivePath) return new NextResponse("Not found", { status: 404 });
+
+	const archiveSlug = isArchiveOn ? getArchiveSlugForHost(request.headers.get("host")) : null;
 	if (archiveSlug) {
 		if (pathname === "/") return rewriteTo(request, `/archive/${archiveSlug}`);
 		if (pathname === "/sitemap.xml") return rewriteTo(request, `/archive/${archiveSlug}/sitemap`);
@@ -57,7 +64,7 @@ export async function proxy(request) {
 		if (archiveUrl) return NextResponse.redirect(archiveUrl, 308);
 	}
 
-	if (PUBLIC_PATHS.some((pattern) => pattern.test(pathname))) return NextResponse.next();
+	if (isArchivePath || PUBLIC_PATHS.some((pattern) => pattern.test(pathname))) return NextResponse.next();
 
 	const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
 	if (session) return NextResponse.next();

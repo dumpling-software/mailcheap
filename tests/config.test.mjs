@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getConfigProblems } from "../lib/config.js";
+import { getConfigProblems, isArchiveEnabled } from "../lib/config.js";
 import { register } from "../instrumentation.js";
 
 const STRONG = { SESSION_SECRET: "s".repeat(32), ADMIN_PASSWORD: "p".repeat(12) };
@@ -24,4 +24,11 @@ test("the server doesn't start with a short secret or password", () => {
 	} finally {
 		process.env = previous;
 	}
+});
+
+test("the public archive is off unless ARCHIVE_ENABLED is exactly true", () => {
+	assert.equal(isArchiveEnabled({}), false);
+	assert.equal(isArchiveEnabled({ ARCHIVE_ENABLED: "1" }), false);
+	assert.equal(isArchiveEnabled({ ARCHIVE_ENABLED: "TRUE" }), false);
+	assert.equal(isArchiveEnabled({ ARCHIVE_ENABLED: "true" }), true);
 });

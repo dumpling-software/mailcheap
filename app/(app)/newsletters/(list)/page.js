@@ -4,6 +4,7 @@ import AvatarNewsletter from "@/components/AvatarNewsletter";
 import HeaderPage from "@/components/HeaderPage";
 import StateEmpty from "@/components/StateEmpty";
 import { Button } from "@/components/ui/button";
+import { hasArchive } from "@/lib/archive-hosts";
 import { listNewslettersWithActiveCounts } from "@/lib/contacts";
 import { connectDb } from "@/lib/db";
 import { formatNumber } from "@/lib/format";
@@ -63,7 +64,7 @@ export default async function NewslettersPage() {
 									) : (
 										newsletter.welcome?.enabled && <Chip icon={Hand}>Welcome</Chip>
 									)}
-									{newsletter.archiveEnabled && <Chip icon={Archive}>Archive</Chip>}
+									{hasArchive(newsletter) && <Chip icon={Archive}>Archive</Chip>}
 								</div>
 							</div>
 						</Link>

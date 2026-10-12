@@ -1,7 +1,7 @@
 import { Link2Off } from "lucide-react";
 import CardNotice from "@/components/CardNotice";
 import FormKeep from "@/components/FormKeep";
-import { getArchiveUrls } from "@/lib/archive-hosts";
+import { getArchiveUrls, hasArchive } from "@/lib/archive-hosts";
 import { connectDb } from "@/lib/db";
 import { verifyKeepToken } from "@/lib/last-chance";
 import Newsletter from "@/models/Newsletter";
@@ -25,7 +25,7 @@ export default async function KeepPage({ searchParams }) {
 				<FormKeep
 					token={validToken}
 					newsletterName={newsletter.name}
-					archiveUrl={newsletter.archiveEnabled ? getArchiveUrls(newsletter).siteIndex : null}
+					archiveUrl={hasArchive(newsletter) ? getArchiveUrls(newsletter).siteIndex : null}
 				/>
 			) : (
 				<CardNotice icon={Link2Off} title="This link doesn't work">
