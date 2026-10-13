@@ -10,7 +10,7 @@ import BadgeStatus from "@/components/BadgeStatus";
 import DialogDiscardCampaign from "@/components/DialogDiscardCampaign";
 import DialogScheduleCampaign from "@/components/DialogScheduleCampaign";
 import DialogSendCampaign from "@/components/DialogSendCampaign";
-import EditorMarkdown from "@/components/EditorMarkdown";
+import EditorMarkdown, { UPLOADING_IMAGE_PREFIX } from "@/components/EditorMarkdown";
 import EditorRich from "@/components/EditorRich";
 import HeaderPage from "@/components/HeaderPage";
 import InputCampaignSlug from "@/components/InputCampaignSlug";
@@ -70,7 +70,7 @@ export default function FormCampaign({
 	const [isTesting, startTesting] = useTransition();
 	const [isWorking, startWorking] = useTransition();
 	const deferredValues = useDeferredValue(values);
-	const isUploading = values.body.includes('src="blob:');
+	const isUploading = values.body.includes('src="blob:') || values.body.includes(UPLOADING_IMAGE_PREFIX);
 
 	const rendered = useMemo(
 		() =>

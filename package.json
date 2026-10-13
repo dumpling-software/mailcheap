@@ -18,7 +18,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:local": "node scripts/local-db.mjs",
     "import:mailerlite": "node --import ./scripts/node/register.mjs scripts/mailerlite/import.mjs",
-    "db:migrate:deploy": "node scripts/migrate.mjs"
+    "db:migrate:deploy": "node scripts/migrate.mjs",
+    "templates:seed": "node scripts/templates/seed.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1146.0",

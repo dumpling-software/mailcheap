@@ -209,6 +209,16 @@ Drip sequences per newsletter, started by a signup, an app event or a property c
 - A contact goes through an automation once, unless it allows re-entry. Before every step Mailcheap checks `exitWhen` and that the contact is still subscribed; unsubscribes, bounces and complaints end the run. Each send node sends at most once per run, however often a job retries.
 - Events and property changes move waiting runs right away; the 5-minute QStash schedule moves the rest. An automation pauses itself when its bounce or complaint rate passes the campaign limits.
 
+## Email templates
+
+Each newsletter can have its own design (Settings → Email template). Markdown and editor campaigns, automations, and welcome and confirmation emails are all rendered into it. HTML campaigns keep their own design.
+
+- **Layout:** a whole HTML email with `{{content}}` where the text goes and `{{footer}}` for the unsubscribe footer. `{{subject}}` and `{{preview_text}}` are filled in too.
+- **CSS:** styles the text. Rules for `.body <tag>` and the button classes `.btn` and `.btn-cell` are also copied inline, for clients that drop `<style>`.
+- **Buttons:** in Markdown, a line of its own like `[[Try it now]](https://example.com)` becomes a button.
+
+The designs for our products live in `templates/`. `node templates/build.mjs` regenerates them, and `npm run templates:seed` gives each product its template. A product that already has one keeps it unless you pass `--force`.
+
 ## Deliverability basics
 
 - **Send from a subdomain** (`mail.example.com`), so a bad week doesn't affect your main domain's email.

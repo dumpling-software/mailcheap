@@ -43,6 +43,13 @@
       "when": 1791806779408,
       "tag": "0005_automations",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791929028102,
+      "tag": "0006_newsletter_template",
+      "breakpoints": true
     }
   ]
 }
