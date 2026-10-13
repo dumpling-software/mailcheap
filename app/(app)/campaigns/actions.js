@@ -9,6 +9,8 @@ import { requireSession } from "@/lib/auth";
 import { getAppUrl, isSendingEnabled } from "@/lib/config";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { campaigns, getDb, isUniqueViolation } from "@/lib/db";
+import { hasTemplate } from "@/lib/email-template";
+import { htmlEmailToMarkdown } from "@/lib/html-to-markdown";
 import { findCampaign as findCampaignById, findNewsletter } from "@/lib/records";
 import { getScheduleProblem } from "@/lib/schedule";
 import { publishScheduledSend } from "@/lib/scheduling";
@@ -90,6 +92,28 @@ export async function saveCampaign(id, values) {
 	if (!isSaved) return { error: "This campaign is already sending" };
 
 	revalidatePath("/campaigns");
+	return { ok: true };
+}
+
+// An imported HTML campaign becomes Markdown, so it can be edited and uses the product's template.
+// The template adds the signature again, so the old one is left out when there is one.
+export async function convertCampaignToMarkdown(id) {
+	const campaign = await findCampaign(id);
+	if (!campaign) return { error: "Campaign not found" };
+	if (campaign.format !== "html") return { error: "Only HTML campaigns can be converted" };
+	const newsletter = await findNewsletter(campaign.newsletterId);
+	const markdown = htmlEmailToMarkdown(campaign.html, {
+		dropSignature: hasTemplate(newsletter),
+		previewText: campaign.previewText,
+	});
+	if (!markdown) return { error: "No text found to convert" };
+	const isSaved = await updateCampaign(
+		campaign._id,
+		{ format: "markdown", markdown, html: "", thumbnailUrl: firstImageUrl({ format: "markdown", markdown }) ?? null },
+		EDITABLE_STATUSES
+	);
+	if (!isSaved) return { error: "Only drafts can be edited" };
+	revalidatePath(`/campaigns/${campaign._id}`);
 	return { ok: true };
 }
 

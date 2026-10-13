@@ -2,9 +2,10 @@
 
 import { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, CircleAlert, Copy, FlaskConical, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { duplicateCampaign, saveCampaign, sendTestCampaign } from "@/app/(app)/campaigns/actions";
+import { convertCampaignToMarkdown, duplicateCampaign, saveCampaign, sendTestCampaign } from "@/app/(app)/campaigns/actions";
 import AvatarNewsletter from "@/components/AvatarNewsletter";
 import BadgeStatus from "@/components/BadgeStatus";
 import DialogDiscardCampaign from "@/components/DialogDiscardCampaign";
@@ -55,6 +56,9 @@ export default function FormCampaign({
 	const isHtml = campaign.format === "html";
 	const [isDiscardOpen, setIsDiscardOpen] = useState(false);
 	const [isToRichOpen, setIsToRichOpen] = useState(false);
+	const [isToMarkdownOpen, setIsToMarkdownOpen] = useState(false);
+	const [isConverting, startConverting] = useTransition();
+	const router = useRouter();
 	// rich (the editor), markdown (typed as Markdown) or html (a designed document, sent as is).
 	const [format, setFormat] = useState(campaign.format === "markdown" ? "markdown" : isHtml ? "html" : "rich");
 	// The rich editor reads its content once, when it mounts: switching to it mounts a new one.
@@ -169,6 +173,17 @@ export default function FormCampaign({
 
 	const isBodyEmpty = !values.body.replace(/<[^>]*>/g, "").trim();
 
+	function convertToMarkdown() {
+		startConverting(async () => {
+			// Edits still waiting for autosave go first, so the conversion reads them.
+			if (!(await persist())) return;
+			const result = await convertCampaignToMarkdown(campaign._id);
+			if (result?.error) return void toast.error(result.error);
+			setIsToMarkdownOpen(false);
+			router.refresh();
+		});
+	}
+
 	const from = newsletter.fromName
 		? `${newsletter.fromName} <${newsletter.fromEmail}>`
 		: newsletter.fromEmail;
@@ -252,6 +267,26 @@ export default function FormCampaign({
 								}}
 							>
 								Switch
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+				<Dialog open={isToMarkdownOpen} onOpenChange={setIsToMarkdownOpen}>
+					<DialogContent className="sm:max-w-md">
+						<DialogHeader>
+							<DialogTitle>Convert to Markdown?</DialogTitle>
+							<DialogDescription>
+								The text, headings, pictures and buttons become Markdown, shown in {newsletter.name}&apos;s email
+								template. The HTML design is replaced; the campaign this was copied from keeps it.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<DialogClose asChild>
+								<Button variant="outline">Keep HTML</Button>
+							</DialogClose>
+							<Button onClick={convertToMarkdown} disabled={isConverting}>
+								{isConverting && <Loader2 className="animate-spin" />}
+								Convert
 							</Button>
 						</DialogFooter>
 					</DialogContent>
@@ -347,6 +382,16 @@ export default function FormCampaign({
 										</button>
 									);
 								})}
+							</div>
+						</Row>
+					)}
+					{isHtml && (
+						<Row label="Format">
+							<div className="flex h-11 items-center justify-between gap-3">
+								<span className="text-xs text-muted-foreground">HTML, sent as designed</span>
+								<Button type="button" variant="outline" size="sm" onClick={() => setIsToMarkdownOpen(true)}>
+									Convert to Markdown
+								</Button>
 							</div>
 						</Row>
 					)}

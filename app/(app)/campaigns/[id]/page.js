@@ -45,7 +45,9 @@ export default async function CampaignPage({ params }) {
 		Array.isArray(domains) && domains.some(({ domain, verified }) => domain === fromDomain && verified);
 
 	return (
+		// Keyed by format: converting an HTML draft to Markdown starts the form over.
 		<FormCampaign
+			key={campaign.format}
 			campaign={serialize(campaign)}
 			newsletter={serialize(newsletter)}
 			audienceCount={audienceCount}
