@@ -16,6 +16,7 @@ import EditorRich from "@/components/EditorRich";
 import HeaderPage from "@/components/HeaderPage";
 import InputCampaignSlug from "@/components/InputCampaignSlug";
 import ListChecks from "@/components/ListChecks";
+import PanelAiDraft from "@/components/PanelAiDraft";
 import PreviewEmail from "@/components/PreviewEmail";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ export default function FormCampaign({
 	testEmail,
 	sendTimes,
 	archiveUrlBase,
+	isAiEnabled = false,
 }) {
 	const isHtml = campaign.format === "html";
 	const [isDiscardOpen, setIsDiscardOpen] = useState(false);
@@ -172,6 +174,31 @@ export default function FormCampaign({
 	}
 
 	const isBodyEmpty = !values.body.replace(/<[^>]*>/g, "").trim();
+
+	// What the editor held before the last AI draft, for Undo.
+	const [beforeDraft, setBeforeDraft] = useState(null);
+
+	function applyDraft(draft, { withMeta }) {
+		setBeforeDraft((current) => current ?? { values, format });
+		setFormat("markdown");
+		setValues((current) => ({
+			...current,
+			format: "markdown",
+			body: draft.markdown,
+			...(withMeta && {
+				subject: draft.subject || current.subject,
+				previewText: draft.previewText || current.previewText,
+			}),
+		}));
+	}
+
+	function undoDraft() {
+		if (!beforeDraft) return;
+		if (beforeDraft.format === "rich") setRichSeed(({ key }) => ({ key: key + 1, html: beforeDraft.values.body }));
+		setFormat(beforeDraft.format);
+		setValues(beforeDraft.values);
+		setBeforeDraft(null);
+	}
 
 	function convertToMarkdown() {
 		startConverting(async () => {
@@ -407,7 +434,17 @@ export default function FormCampaign({
 								className="block min-h-[560px] w-full resize-none bg-transparent px-4 py-4 font-mono text-[13px] leading-6 outline-none [field-sizing:content] placeholder:text-muted-foreground"
 							/>
 						</div>
-					) : format === "markdown" ? (
+					) : null}
+					{!isHtml && isAiEnabled && (
+						<PanelAiDraft
+							campaignId={campaign._id}
+							values={values}
+							onApply={applyDraft}
+							onUndo={undoDraft}
+							canUndo={Boolean(beforeDraft)}
+						/>
+					)}
+					{isHtml ? null : format === "markdown" ? (
 						<EditorMarkdown value={values.body} onChange={updateBody} />
 					) : (
 						<EditorRich key={richSeed.key} content={richSeed.html} onChange={updateBody} />

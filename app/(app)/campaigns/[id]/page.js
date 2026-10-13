@@ -4,7 +4,7 @@ import CampaignReport from "@/components/CampaignReport";
 import FormCampaign from "@/components/FormCampaign";
 import { getArchiveUrls, hasArchive } from "@/lib/archive-hosts";
 import { findSendTimes } from "@/lib/campaign-queries";
-import { isSendingEnabled } from "@/lib/config";
+import { isAiConfigured, isSendingEnabled } from "@/lib/config";
 import { contacts, getDb, messages } from "@/lib/db";
 import { messageStatsSelect } from "@/lib/message-stats";
 import { findCampaign, findNewsletter } from "@/lib/records";
@@ -56,6 +56,7 @@ export default async function CampaignPage({ params }) {
 			testEmail={process.env.ADMIN_EMAIL}
 			sendTimes={sendTimes}
 			archiveUrlBase={hasArchive(newsletter) ? getArchiveUrls(newsletter).absolutePost("") : null}
+			isAiEnabled={isAiConfigured()}
 		/>
 	);
 }
