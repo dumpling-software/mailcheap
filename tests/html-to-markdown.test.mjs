@@ -31,6 +31,10 @@ test("MailerLite's visible preheader is dropped when it matches the preview text
 	assert.equal(htmlEmailToMarkdown(html), "Fresh credits, every month.\n\nHi friend,");
 });
 
+test("bold split across adjacent tags stays one bold run", () => {
+	assert.equal(htmlEmailToMarkdown("<p>simply <strong>e</strong><strong>nter YouTube</strong> URL</p>"), "simply **enter YouTube** URL");
+});
+
 test("tracking pixels and non-web images are left out", () => {
 	const html = '<p>Hi</p><img src="https://t.example.com/o.gif" width="1" height="1"><img src="cid:logo">';
 	assert.equal(htmlEmailToMarkdown(html), "Hi");
