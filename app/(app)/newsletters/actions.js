@@ -7,6 +7,7 @@ import { revalidateArchive } from "@/lib/archive-data";
 import { requireSession } from "@/lib/auth";
 import { CLEANUP_LIMITS } from "@/lib/cleanup";
 import { isSendingEnabled } from "@/lib/config";
+import { validateTemplate } from "@/lib/email-template";
 import { getConfirmationProblem } from "@/lib/confirmation-content";
 import { setCurrentNewsletter } from "@/lib/current-newsletter";
 import { eq } from "drizzle-orm";
@@ -63,6 +64,10 @@ function readNewsletter(formData) {
 			previewText: readText(formData, "confirmationPreviewText"),
 			markdown: String(formData.get("confirmationMarkdown") ?? ""),
 		},
+		template: {
+			layout: String(formData.get("templateLayout") ?? "").trim(),
+			css: String(formData.get("templateCss") ?? "").trim(),
+		},
 	};
 }
 
@@ -91,6 +96,8 @@ function validateNewsletter(values) {
 	if (!isWithin(values.cleanup.days, minDays, maxDays)) {
 		return `Quiet days should be a whole number from ${minDays} to ${maxDays}`;
 	}
+	const templateProblem = validateTemplate(values.template);
+	if (templateProblem) return `Email template: ${templateProblem}`;
 	if (values.welcome.enabled && (!values.welcome.subject || !values.welcome.markdown.trim())) {
 		return "Welcome email needs a subject and content";
 	}
@@ -120,12 +127,14 @@ export async function saveNewsletter(_state, formData) {
 	if (error) return { error };
 	// A collapsed email section sends no fields, and what it had saved stays as it is.
 	// So does the archive section while archives are off for the install.
-	const { welcome, confirmation, archiveEnabled, description, author, socialLinks, ...rest } = values;
+	const { welcome, confirmation, template, archiveEnabled, description, author, socialLinks, ...rest } = values;
 	const document = {
 		...rest,
 		...(formData.has("description") && { archiveEnabled, description, author, socialLinks: socialLinks.links }),
 		...(formData.has("welcomeSubject") && { welcome }),
 		...(formData.has("confirmationSubject") && { confirmation }),
+		// An empty layout goes back to the built-in design.
+		...(formData.has("templateLayout") && { template: template.layout ? template : null }),
 	};
 
 	let createdId;

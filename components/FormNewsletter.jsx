@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { saveNewsletter, sendWelcomeTest } from "@/app/(app)/newsletters/actions";
 import AvatarNewsletter from "@/components/AvatarNewsletter";
 import PreviewEmail from "@/components/PreviewEmail";
+import SectionTemplate from "@/components/SectionTemplate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -50,6 +51,20 @@ export default function FormNewsletter({
 	const [isCleanupEnabled, setIsCleanupEnabled] = useState(savedCleanup.enabled);
 	const [cleanup, setCleanup] = useState({ issues: String(savedCleanup.issues), days: String(savedCleanup.days) });
 	const deferredWelcome = useDeferredValue(welcome);
+	const [template, setTemplate] = useState({
+		layout: newsletter?.template?.layout ?? "",
+		css: newsletter?.template?.css ?? "",
+	});
+	const deferredTemplate = useDeferredValue(template);
+	// What the previews render with: the template as edited, before it's saved.
+	const previewNewsletter = useMemo(
+		() => ({
+			name,
+			postalAddress: newsletter?.postalAddress,
+			template: deferredTemplate.layout.trim() ? deferredTemplate : null,
+		}),
+		[name, newsletter?.postalAddress, deferredTemplate]
+	);
 
 	useEffect(() => {
 		if (state?.ok) toast.success("Saved");
@@ -62,9 +77,9 @@ export default function FormNewsletter({
 				markdown: deferredWelcome.markdown,
 				subject: deferredWelcome.subject,
 				previewText: deferredWelcome.previewText,
-				newsletter: { name, postalAddress: newsletter?.postalAddress },
+				newsletter: previewNewsletter,
 			}).html.replaceAll(UNSUBSCRIBE_PLACEHOLDER, "#"),
-		[deferredWelcome, name, newsletter?.postalAddress]
+		[deferredWelcome, previewNewsletter]
 	);
 
 	// Until it's edited, the built-in email follows the name.
@@ -75,20 +90,20 @@ export default function FormNewsletter({
 	const deferredConfirmation = useDeferredValue(confirmation);
 	const confirmationHtml = useMemo(
 		() =>
-			renderEmail({ ...deferredConfirmation, newsletter: { name, postalAddress: newsletter?.postalAddress } })
+			renderEmail({ ...deferredConfirmation, newsletter: previewNewsletter })
 				.html.replaceAll(UNSUBSCRIBE_PLACEHOLDER, "#")
 				.replaceAll(CONFIRM_URL_PLACEHOLDER, "#"),
-		[deferredConfirmation, name, newsletter?.postalAddress]
+		[deferredConfirmation, previewNewsletter]
 	);
 
 	const lastChance = useMemo(() => {
 		const content = getLastChanceContent({ name, fromEmail });
-		const { html } = renderEmail({ ...content, newsletter: { name, postalAddress: newsletter?.postalAddress } });
+		const { html } = renderEmail({ ...content, newsletter: previewNewsletter });
 		return {
 			...content,
 			html: html.replaceAll(UNSUBSCRIBE_PLACEHOLDER, "#").replaceAll(KEEP_URL_PLACEHOLDER, "#"),
 		};
-	}, [name, fromEmail, newsletter?.postalAddress]);
+	}, [name, fromEmail, previewNewsletter]);
 
 	const previewImageUrl = IMAGE_PREVIEW_PATTERN.test(imageUrl) ? imageUrl : "";
 	const fromDomain = fromEmail.split("@")[1]?.trim().toLowerCase();
@@ -202,6 +217,14 @@ export default function FormNewsletter({
 					/>
 				</Field>
 			</Section>
+
+			<SectionTemplate
+				template={template}
+				onChange={setTemplate}
+				newsletter={previewNewsletter}
+				sender={{ name, fromName, fromEmail, imageUrl: previewImageUrl }}
+				stagger={1}
+			/>
 
 			<Section
 				title="Confirm new signups"

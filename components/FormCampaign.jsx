@@ -2,19 +2,21 @@
 
 import { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, CircleAlert, Copy, FlaskConical, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { duplicateCampaign, saveCampaign, sendTestCampaign } from "@/app/(app)/campaigns/actions";
+import { convertCampaignToMarkdown, duplicateCampaign, saveCampaign, sendTestCampaign } from "@/app/(app)/campaigns/actions";
 import AvatarNewsletter from "@/components/AvatarNewsletter";
 import BadgeStatus from "@/components/BadgeStatus";
 import DialogDiscardCampaign from "@/components/DialogDiscardCampaign";
 import DialogScheduleCampaign from "@/components/DialogScheduleCampaign";
 import DialogSendCampaign from "@/components/DialogSendCampaign";
-import EditorMarkdown from "@/components/EditorMarkdown";
+import EditorMarkdown, { UPLOADING_IMAGE_PREFIX } from "@/components/EditorMarkdown";
 import EditorRich from "@/components/EditorRich";
 import HeaderPage from "@/components/HeaderPage";
 import InputCampaignSlug from "@/components/InputCampaignSlug";
 import ListChecks from "@/components/ListChecks";
+import PanelAiDraft from "@/components/PanelAiDraft";
 import PreviewEmail from "@/components/PreviewEmail";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,10 +53,14 @@ export default function FormCampaign({
 	testEmail,
 	sendTimes,
 	archiveUrlBase,
+	isAiEnabled = false,
 }) {
 	const isHtml = campaign.format === "html";
 	const [isDiscardOpen, setIsDiscardOpen] = useState(false);
 	const [isToRichOpen, setIsToRichOpen] = useState(false);
+	const [isToMarkdownOpen, setIsToMarkdownOpen] = useState(false);
+	const [isConverting, startConverting] = useTransition();
+	const router = useRouter();
 	// rich (the editor), markdown (typed as Markdown) or html (a designed document, sent as is).
 	const [format, setFormat] = useState(campaign.format === "markdown" ? "markdown" : isHtml ? "html" : "rich");
 	// The rich editor reads its content once, when it mounts: switching to it mounts a new one.
@@ -70,7 +76,7 @@ export default function FormCampaign({
 	const [isTesting, startTesting] = useTransition();
 	const [isWorking, startWorking] = useTransition();
 	const deferredValues = useDeferredValue(values);
-	const isUploading = values.body.includes('src="blob:');
+	const isUploading = values.body.includes('src="blob:') || values.body.includes(UPLOADING_IMAGE_PREFIX);
 
 	const rendered = useMemo(
 		() =>
@@ -169,6 +175,42 @@ export default function FormCampaign({
 
 	const isBodyEmpty = !values.body.replace(/<[^>]*>/g, "").trim();
 
+	// What the editor held before the last AI draft, for Undo.
+	const [beforeDraft, setBeforeDraft] = useState(null);
+
+	function applyDraft(draft, { withMeta }) {
+		setBeforeDraft((current) => current ?? { values, format });
+		setFormat("markdown");
+		setValues((current) => ({
+			...current,
+			format: "markdown",
+			body: draft.markdown,
+			...(withMeta && {
+				subject: draft.subject || current.subject,
+				previewText: draft.previewText || current.previewText,
+			}),
+		}));
+	}
+
+	function undoDraft() {
+		if (!beforeDraft) return;
+		if (beforeDraft.format === "rich") setRichSeed(({ key }) => ({ key: key + 1, html: beforeDraft.values.body }));
+		setFormat(beforeDraft.format);
+		setValues(beforeDraft.values);
+		setBeforeDraft(null);
+	}
+
+	function convertToMarkdown() {
+		startConverting(async () => {
+			// Edits still waiting for autosave go first, so the conversion reads them.
+			if (!(await persist())) return;
+			const result = await convertCampaignToMarkdown(campaign._id);
+			if (result?.error) return void toast.error(result.error);
+			setIsToMarkdownOpen(false);
+			router.refresh();
+		});
+	}
+
 	const from = newsletter.fromName
 		? `${newsletter.fromName} <${newsletter.fromEmail}>`
 		: newsletter.fromEmail;
@@ -252,6 +294,26 @@ export default function FormCampaign({
 								}}
 							>
 								Switch
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+				<Dialog open={isToMarkdownOpen} onOpenChange={setIsToMarkdownOpen}>
+					<DialogContent className="sm:max-w-md">
+						<DialogHeader>
+							<DialogTitle>Convert to Markdown?</DialogTitle>
+							<DialogDescription>
+								The text, headings, pictures and buttons become Markdown, shown in {newsletter.name}&apos;s email
+								template. The HTML design is replaced; the campaign this was copied from keeps it.
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<DialogClose asChild>
+								<Button variant="outline">Keep HTML</Button>
+							</DialogClose>
+							<Button onClick={convertToMarkdown} disabled={isConverting}>
+								{isConverting && <Loader2 className="animate-spin" />}
+								Convert
 							</Button>
 						</DialogFooter>
 					</DialogContent>
@@ -350,6 +412,16 @@ export default function FormCampaign({
 							</div>
 						</Row>
 					)}
+					{isHtml && (
+						<Row label="Format">
+							<div className="flex h-11 items-center justify-between gap-3">
+								<span className="text-xs text-muted-foreground">HTML, sent as designed</span>
+								<Button type="button" variant="outline" size="sm" onClick={() => setIsToMarkdownOpen(true)}>
+									Convert to Markdown
+								</Button>
+							</div>
+						</Row>
+					)}
 					{isHtml ? (
 						<div className="relative">
 							<span className="pointer-events-none absolute top-3 right-4 text-xs text-muted-foreground">HTML</span>
@@ -362,7 +434,17 @@ export default function FormCampaign({
 								className="block min-h-[560px] w-full resize-none bg-transparent px-4 py-4 font-mono text-[13px] leading-6 outline-none [field-sizing:content] placeholder:text-muted-foreground"
 							/>
 						</div>
-					) : format === "markdown" ? (
+					) : null}
+					{!isHtml && isAiEnabled && (
+						<PanelAiDraft
+							campaignId={campaign._id}
+							values={values}
+							onApply={applyDraft}
+							onUndo={undoDraft}
+							canUndo={Boolean(beforeDraft)}
+						/>
+					)}
+					{isHtml ? null : format === "markdown" ? (
 						<EditorMarkdown value={values.body} onChange={updateBody} />
 					) : (
 						<EditorRich key={richSeed.key} content={richSeed.html} onChange={updateBody} />

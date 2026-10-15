@@ -54,6 +54,8 @@ export const newsletters = pgTable(
 		welcome: jsonb().notNull().default({}),
 		// { subject, previewText, markdown }: the built-in confirmation email goes out until it has one.
 		confirmation: jsonb().notNull().default({}),
+		// { layout, css }: the product's email design (lib/email-template.js); null uses the built-in one.
+		template: jsonb(),
 		...external(),
 		...timestamps(),
 	},
