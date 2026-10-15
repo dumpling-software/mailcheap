@@ -22,6 +22,7 @@ test("a MailerLite campaign keeps its text, headings, pictures and buttons", () 
 test("the signature and founder card go when the template adds them, and stay otherwise", () => {
 	assert.doesNotMatch(htmlEmailToMarkdown(poof, { dropSignature: true }), /Rafal from Poof|founder of Poof/);
 	assert.match(htmlEmailToMarkdown(poof), /Rafal from Poof/);
+	assert.doesNotMatch(htmlEmailToMarkdown(poof), /^#+\s*$/m);
 });
 
 test("MailerLite's visible preheader is dropped when it matches the preview text", () => {
