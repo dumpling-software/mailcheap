@@ -23,3 +23,12 @@ test("outside emails a button is a marked link, so the editor keeps it as a link
 test("a button inside a sentence stays text", () => {
 	assert.ok(!markdownToHtml("See [[Docs]](https://docs.poof.bg) here").includes("btn"));
 });
+
+test("{.center} after a button centers it", () => {
+	const { html } = renderEmail({ markdown: "[[Get key]](https://dash.poof.bg){.center}" });
+	assert.match(html, /<table role="presentation" class="btn-table-center" align="center"[^>]*>.*?Get key<\/a>/s);
+	assert.equal(
+		markdownToHtml("[[Docs]](https://docs.poof.bg){.center}"),
+		'<p style="text-align:center;"><a class="btn" data-button href="https://docs.poof.bg">Docs</a></p>\n'
+	);
+});

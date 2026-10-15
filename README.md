@@ -214,8 +214,9 @@ Drip sequences per newsletter, started by a signup, an app event or a property c
 Each newsletter can have its own design (Settings → Email template). Markdown and editor campaigns, automations, and welcome and confirmation emails are all rendered into it. HTML campaigns keep their own design.
 
 - **Layout:** a whole HTML email with `{{content}}` where the text goes and `{{footer}}` for the unsubscribe footer. `{{subject}}` and `{{preview_text}}` are filled in too.
-- **CSS:** styles the text. Rules for `.body <tag>` and the button classes `.btn` and `.btn-cell` are also copied inline, for clients that drop `<style>`.
-- **Buttons:** in Markdown, a line of its own like `[[Try it now]](https://example.com)` becomes a button.
+- **CSS:** styles the text. Rules for `.body <tag>` and for classes (`.btn`, `.btn-cell`, `.btn-table`, `.caption`…) are also copied inline, for clients that drop `<style>`.
+- **Buttons:** in Markdown, a line of its own like `[[Try it now]](https://example.com)` becomes a button; `{.center}` right after it centers it.
+- **Captions:** a picture's title, `![](https://…/shot.png "The caption")`, shows as a caption under it (also for a linked picture). Templates style them with `.figure`, `.captioned` and `.caption`.
 
 **Write with AI:** with `OPENROUTER_API_KEY` set, the campaign editor has a panel where you paste the copy, links and pictures. Claude writes the email in the product's Markdown, following its last two sent campaigns, and you can ask for changes or undo it.
 
