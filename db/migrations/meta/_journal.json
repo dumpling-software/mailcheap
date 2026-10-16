@@ -50,6 +50,13 @@
       "when": 1791929028102,
       "tag": "0006_newsletter_template",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792161113945,
+      "tag": "0007_transactional_messages",
+      "breakpoints": true
     }
   ]
 }

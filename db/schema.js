@@ -244,6 +244,34 @@ export const events = pgTable(
 	(t) => [index("events_campaign_type_idx").on(t.campaignId, t.type), index("events_ses_message_idx").on(t.sesMessageId)]
 );
 
+// Email other apps send over SES SMTP with the transactional configuration set (login links,
+// notifications), one row per SES message, built from its events (lib/transactional.js).
+export const transactionalMessages = pgTable(
+	"transactional_messages",
+	{
+		_id: id(),
+		sesMessageId: text().notNull(),
+		domain: text(),
+		fromAddress: text(),
+		email: text(),
+		subject: text(),
+		provider: text(),
+		status: text().notNull().default("sent"),
+		error: text(),
+		sentAt: at("sent_at").notNull(),
+		deliveredAt: at("delivered_at"),
+		delayedAt: at("delayed_at"),
+		bouncedAt: at("bounced_at"),
+		complainedAt: at("complained_at"),
+		...timestamps(),
+	},
+	(t) => [
+		uniqueIndex("transactional_messages_ses_message_key").on(t.sesMessageId),
+		index("transactional_messages_sent_idx").on(t.sentAt),
+		index("transactional_messages_domain_sent_idx").on(t.domain, t.sentAt),
+	]
+);
+
 // Global: an address listed here is never emailed again from any newsletter. Only hard bounces (the
 // address doesn't exist) and manual blocks: unsubscribes and spam complaints are per newsletter.
 export const suppressions = pgTable(

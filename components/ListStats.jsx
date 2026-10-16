@@ -7,8 +7,8 @@ import { PERIOD_DAYS, compareCount, compareRate } from "@/lib/overview-series";
 import { cn } from "@/lib/utils";
 
 // The email stats of a period, each with its change from the period before. A rate changes by the
-// difference between the two rates.
-export default function ListStats({ current, previous }) {
+// difference between the two rates. Transactional email has no opens or clicks: omit hides them.
+export default function ListStats({ current, previous, omit = [] }) {
 	const reached = current.delivered || current.sent;
 	const previousReached = previous.delivered || previous.sent;
 	const rate = (key, total, previousTotal, digits = 1) => ({
@@ -18,7 +18,7 @@ export default function ListStats({ current, previous }) {
 		digits,
 	});
 
-	const stats = [
+	const all = [
 		{
 			label: "Sent",
 			value: formatCompact(current.sent),
@@ -42,9 +42,10 @@ export default function ListStats({ current, previous }) {
 			tone: rateTone(current.complained, current.sent, LIMITS.complaintRate),
 		},
 	];
+	const stats = all.filter(({ label }) => !omit.includes(label));
 
 	return (
-		<dl className="grid grid-cols-3 gap-px bg-border/60 lg:grid-cols-6">
+		<dl className={cn("grid gap-px bg-border/60", stats.length === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-3 lg:grid-cols-6")}>
 			{stats.map(({ label, value, title, previousValue, change, digits, isCount, higherIsBetter, tone = "default" }) => {
 				const text = formatChange(change, { digits });
 				const previousLabel = `${previousValue} in the previous ${PERIOD_DAYS} days`;

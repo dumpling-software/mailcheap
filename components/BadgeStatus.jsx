@@ -42,6 +42,7 @@ const STATUS_TONES = {
 	paused: "amber",
 	pending: "amber",
 	temporary_failure: "amber",
+	delayed: "amber",
 	probation: "amber",
 	sandbox: "amber",
 	bounced: "red",
