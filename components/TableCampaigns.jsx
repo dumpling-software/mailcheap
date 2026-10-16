@@ -1,6 +1,7 @@
 import Link from "next/link";
 import BadgeStatus from "@/components/BadgeStatus";
 import MenuCampaign from "@/components/MenuCampaign";
+import TableRowLink from "@/components/TableRowLink";
 import TextEmpty from "@/components/TextEmpty";
 import ThumbnailCampaign from "@/components/ThumbnailCampaign";
 import TimeLocal from "@/components/TimeLocal";
@@ -44,14 +45,14 @@ export default function TableCampaigns({ campaigns, newsletters, hasActions = fa
 						const date = campaign.sentAt || campaign.startedAt;
 						const newsletter = newsletters[campaign.newsletterId.toString()];
 						return (
-							<TableRow key={id} className="relative">
+							<TableRowLink key={id} href={`/campaigns/${id}`}>
 								<TableCell className="w-full max-w-0 py-3 pl-4 sm:w-1/2">
 									<div className="flex min-w-0 items-center gap-3.5">
 										<ThumbnailCampaign campaign={campaign} newsletter={newsletter} />
 										<div className="min-w-0">
 											<Link
 												href={`/campaigns/${id}`}
-												className="block truncate font-medium after:absolute after:inset-0"
+												className="block truncate font-medium"
 											>
 												{campaign.subject || "Untitled"}
 											</Link>
@@ -98,7 +99,7 @@ export default function TableCampaigns({ campaigns, newsletters, hasActions = fa
 										/>
 									</TableCell>
 								)}
-							</TableRow>
+							</TableRowLink>
 						);
 					})}
 				</TableBody>
