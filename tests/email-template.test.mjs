@@ -49,6 +49,14 @@ test("only the first element loses its top margin, so an opening heading sits at
 	assert.equal(html, '\n<h2 style="color: #000;font-size: 24px;margin-top:0">One</h2><h2 style="color: #000;font-size: 24px">Two</h2>');
 });
 
+test("an h1 that opens the email is its title and gets the .title rules; later ones don't", () => {
+	const html = inlineTemplateStyles("<h1>Welcome</h1><p>Hi</p><h1>Section</h1>", ".body h1, .title { margin: 40px 0 20px; }\n.title { margin-bottom: 60px; }");
+	assert.equal(
+		html,
+		'<h1 style="margin: 40px 0 20px;margin-bottom: 60px;margin-top:0" class="title">Welcome</h1><p>Hi</p><h1 style="margin: 40px 0 20px">Section</h1>'
+	);
+});
+
 test("applyTemplate fills the slots and keeps $ in the content as written", () => {
 	const html = applyTemplate({ layout, css }, { content: "Price: $& $1", footer: "<p>Bye</p>", top: "<i>top</i>" });
 	assert.ok(html.includes("<main>Price: $& $1</main>"));

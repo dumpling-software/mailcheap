@@ -53,11 +53,13 @@ table { border-collapse: collapse; }
 }
 
 // Spacing follows the MailerLite originals: paragraphs 16px with 1.65 line height and room between
-// them, and wide gaps around pictures, lists and buttons.
-function css({ heading, headingFont, h1, h2, link, button, buttonRadius, buttonWeight = "normal", image }) {
+// them, and wide gaps around pictures, lists and buttons. A title that opens the email (.title) has
+// more room under it than a section heading.
+function css({ heading, headingFont, h1, titleGap, h2, link, button, buttonRadius, buttonWeight = "normal", image }) {
 	const font = headingFont ? ` font-family: ${headingFont};` : "";
 	return `.body p { margin: 0 0 20px; }
-.body h1 { margin: 40px 0 28px; font-size: ${h1}px; line-height: 1.25; font-weight: 700; color: ${heading};${font} }
+.body h1, .title { margin: 40px 0 20px; font-size: ${h1}px; line-height: 1.25; font-weight: 700; color: ${heading};${font} }
+.title { margin-bottom: ${titleGap}px; }
 .body h2 { margin: 40px 0 16px; font-size: ${h2}px; line-height: 1.25; font-weight: 700; color: ${heading};${font} }
 .body h3 { margin: 32px 0 12px; font-size: 18px; line-height: 1.3; font-weight: bold; color: ${heading};${font} }
 .body a { color: ${link}; text-decoration: underline; }
@@ -87,7 +89,7 @@ const PRODUCTS = {
 			signature: "- Rafal from Poof -",
 			bio: "Hi, I am Rafal - the founder of Poof.<br>I created it to help creators like you easily edit images. Hope you find Poof helpful!",
 		},
-		css: { heading: "#000000", h1: 27, h2: 22, link: "#363636", button: "#6466F1", buttonRadius: "10px", image: "12px" },
+		css: { heading: "#000000", h1: 27, titleGap: 60, h2: 22, link: "#363636", button: "#6466F1", buttonRadius: "10px", image: "12px" },
 	},
 	supadata: {
 		layout: {
@@ -98,7 +100,7 @@ const PRODUCTS = {
 			signature: "- Rafal from Supadata -",
 			bio: "Hi, I am Rafal - the founder of Supadata.<br>I created it to help makers like you easily access public web data. Hope you find Supadata helpful!",
 		},
-		css: { heading: "#000000", h1: 27, h2: 24, link: "#363636", button: "#000000", buttonRadius: "0px", image: "0px" },
+		css: { heading: "#000000", h1: 27, titleGap: 60, h2: 24, link: "#363636", button: "#000000", buttonRadius: "0px", image: "0px" },
 	},
 	// Gistly's automation emails: a white card with round corners on light gray, Inter text, Poppins
 	// headings and purple buttons.
@@ -116,6 +118,7 @@ const PRODUCTS = {
 			heading: "#000000",
 			headingFont: "'Poppins',Helvetica,Arial,sans-serif",
 			h1: 27,
+			titleGap: 32,
 			h2: 22,
 			link: "#a855f7",
 			button: "#a855f7",
