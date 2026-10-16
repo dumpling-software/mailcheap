@@ -31,6 +31,35 @@ test("MailerLite's visible preheader is dropped when it matches the preview text
 	assert.equal(htmlEmailToMarkdown(html), "Fresh credits, every month.\n\nHi friend,");
 });
 
+test("bold split across adjacent tags stays one bold run", () => {
+	assert.equal(htmlEmailToMarkdown("<p>simply <strong>e</strong><strong>nter YouTube</strong> URL</p>"), "simply **enter YouTube** URL");
+});
+
+test("a linked picture stays one clickable picture", () => {
+	const html = '<p>Look:</p><a href="https://youtu.be/abc"><img src="https://img.example.com/t.jpg" width="540"></a><p>Caption</p>';
+	assert.equal(htmlEmailToMarkdown(html), "Look:\n\n[![](https://img.example.com/t.jpg)](https://youtu.be/abc)\n\nCaption");
+});
+
+test("empty quote blocks leave nothing behind", () => {
+	assert.equal(htmlEmailToMarkdown("<p>Start:</p><blockquote> </blockquote><ol><li>One</li></ol>"), "Start:\n\n1.  One");
+});
+
+test("small print under a picture becomes its caption, and stays text elsewhere", () => {
+	const html =
+		'<a href="https://youtu.be/abc"><img src="https://img.example.com/t.jpg" width="540"></a>' +
+		'<p style="font-size: 13px;"><strong>My video (Full Tutorial)</strong></p>' +
+		'<p style="font-size: 16px;">Body</p><p style="font-size: 12px;">Fine print</p>';
+	assert.equal(
+		htmlEmailToMarkdown(html),
+		'[![](https://img.example.com/t.jpg "My video (Full Tutorial)")](https://youtu.be/abc)\n\nBody\n\nFine print'
+	);
+});
+
+test("a centered button stays centered", () => {
+	const html = '<table align="center"><tr><td><a href="https://dash.poof.bg" style="padding: 20px 25px;">Get key</a></td></tr></table>';
+	assert.equal(htmlEmailToMarkdown(html), "[[Get key]](https://dash.poof.bg){.center}");
+});
+
 test("tracking pixels and non-web images are left out", () => {
 	const html = '<p>Hi</p><img src="https://t.example.com/o.gif" width="1" height="1"><img src="cid:logo">';
 	assert.equal(htmlEmailToMarkdown(html), "Hi");
