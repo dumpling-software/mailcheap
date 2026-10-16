@@ -103,10 +103,12 @@ export default function PreviewEmail({
 				<iframe
 					ref={frameRef}
 					title="Email preview"
-					// Same origin lets the report read the email's height; without allow-scripts nothing in it runs.
-					sandbox={fit === "content" ? "allow-same-origin" : ""}
+					// Same origin lets the report read the email's height and Escape out (forwardEscape); without
+					// allow-scripts nothing in the email runs.
+					sandbox="allow-same-origin"
 					srcDoc={html}
 					onLoad={(event) => {
+						forwardEscape(event.currentTarget);
 						if (!isContentFit) return;
 						const root = event.currentTarget.contentDocument?.documentElement;
 						if (root) setContentHeight(root.scrollHeight);
@@ -123,6 +125,14 @@ export default function PreviewEmail({
 	);
 	// On the page's body, so no parent's layout keeps it inside the editor column.
 	return isFullScreen ? createPortal(preview, document.body) : preview;
+}
+
+// A click in the email puts the focus in its frame, whose key presses never reach the dashboard: Escape there is passed
+// on, so it still closes full screen.
+function forwardEscape(frame) {
+	frame.contentDocument?.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+	});
 }
 
 const DEVICES = [

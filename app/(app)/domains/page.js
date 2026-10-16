@@ -7,6 +7,7 @@ import ImageFavicon from "@/components/ImageFavicon";
 import SkeletonDomains from "@/components/SkeletonDomains";
 import StateEmpty from "@/components/StateEmpty";
 import { Button } from "@/components/ui/button";
+import { checkDmarc } from "@/lib/dmarc";
 import { rootDomain } from "@/lib/favicon";
 import { getSesSuppression, listSesDomains } from "@/lib/ses";
 
@@ -79,6 +80,7 @@ async function ListDomains() {
 		);
 	}
 	if (domains.length === 0) return <StateEmpty icon={Globe} title="No domains in SES" />;
+	const dmarcs = await Promise.all(domains.map((domain) => checkDmarc(domain.domain)));
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -98,6 +100,7 @@ async function ListDomains() {
 						<div className="flex flex-wrap items-center gap-2">
 							<StatusPill label="DKIM" status={domain.dkimStatus} />
 							{domain.mailFromDomain && <StatusPill label="Return path" status={domain.mailFromStatus} />}
+							<BadgeDmarc domain={domain.domain} dmarc={dmarcs[index]} />
 							<BadgeStatus
 								status={domain.verified ? "verified" : "pending"}
 								label={domain.verified ? "Verified" : "Pending"}
@@ -113,7 +116,7 @@ async function ListDomains() {
 						<div className="overflow-x-auto border-t border-border/60">
 							<table className="w-full text-sm">
 								<tbody className="divide-y divide-border/60">
-									{domain.records.map((record) => (
+									{withDmarcRecord(domain, dmarcs[index]).map((record) => (
 										<tr key={`${record.type}-${record.name}-${record.value}`}>
 											<td className="w-16 py-2 pl-4 align-middle font-mono text-xs text-muted-foreground">
 												{record.type}
@@ -140,6 +143,28 @@ async function ListDomains() {
 			))}
 		</div>
 	);
+}
+
+// Gmail and Yahoo require DMARC from bulk senders. A parent domain's record covers its subdomains.
+function BadgeDmarc({ domain, dmarc }) {
+	const { status, label } = DMARC_BADGES[dmarc.status];
+	const isOnParent = dmarc.status === "found" && dmarc.host !== domain;
+	return <BadgeStatus status={status} label={isOnParent ? `DMARC on ${dmarc.host}` : label} />;
+}
+
+const DMARC_BADGES = {
+	found: { status: "success", label: "DMARC ok" },
+	missing: { status: "pending", label: "DMARC missing" },
+	multiple: { status: "failed", label: "DMARC: keep one record" },
+	invalid: { status: "failed", label: "DMARC not valid" },
+	unknown: { status: "unknown", label: "DMARC not checked" },
+};
+
+// Without a working DMARC record, the records list one to add: start with p=none, then move to p=quarantine once
+// the reports look clean.
+function withDmarcRecord(domain, dmarc) {
+	if (dmarc.status === "found" || dmarc.status === "unknown") return domain.records;
+	return [...domain.records, { type: "TXT", name: `_dmarc.${domain.domain}`, value: "v=DMARC1; p=none;" }];
 }
 
 function StatusPill({ label, status }) {

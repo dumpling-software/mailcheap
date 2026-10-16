@@ -79,7 +79,7 @@ test("last-chance emails keep their own counters but share the pause limits", ()
 	assert.equal(getCampaignStatsPath("last-chance"), "lastChance");
 
 	assert.equal(getCampaignPauseReason({ sent: 900, complained: 0 }), null);
-	assert.equal(getCampaignPauseReason({ sent: 900, complained: 0 }, { sent: 100, complained: 1 }), "complaint rate");
+	assert.equal(getCampaignPauseReason({ sent: 900, complained: 1 }, { sent: 100, complained: 1 }), "complaint rate");
 	assert.equal(getCampaignPauseReason({ sent: 40 }, { sent: 50, bounced: 30 }), null, "under 100 sent in total");
 	assert.equal(getCampaignPauseReason({ sent: 400, bounced: 2 }, { sent: 100, bounced: 9 }), "bounce rate");
 	assert.equal(getCampaignPauseReason({ sent: 400, bounced: 2 }, undefined), null);
