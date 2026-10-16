@@ -44,10 +44,13 @@ export default function SkeletonOverview() {
 	);
 }
 
-export function SkeletonStats() {
+export function SkeletonStats({ count = 6 }) {
 	return (
-		<div aria-hidden="true" className="grid grid-cols-3 gap-px bg-border/60 lg:grid-cols-6">
-			{[12, 16, 14, 13, 15, 18].map((width, index) => (
+		<div
+			aria-hidden="true"
+			className={cn("grid gap-px bg-border/60", count === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-3 lg:grid-cols-6")}
+		>
+			{[12, 16, 14, 13, 15, 18].slice(0, count).map((width, index) => (
 				<div key={index} className="flex flex-col gap-1 bg-card px-4 py-3.5 sm:px-5">
 					<Line height="h-4" className="h-2.5" style={{ width: `${width * 4}px` }} />
 					<Line height="h-7" className="h-5 w-14" />

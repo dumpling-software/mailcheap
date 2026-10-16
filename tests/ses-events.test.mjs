@@ -228,3 +228,54 @@ test("unknown or malformed events are ignored", () => {
 	];
 	for (const value of ignored) assert.equal(getSesEventPlan(value), null, JSON.stringify(value));
 });
+
+const transactionalMail = {
+	timestamp: "2026-10-04T09:59:59.000Z",
+	messageId: "0100019000000abc-transactional-000000",
+	source: "Gistly <noreply@notifications.gist.ly>",
+	destination: ["Reader@Gmail.com"],
+	commonHeaders: { subject: "Your login link" },
+	tags: { "ses:configuration-set": ["transactional"], "ses:from-domain": ["notifications.gist.ly"] },
+};
+
+test("events from the transactional configuration set carry their own record", () => {
+	const plan = getSesEventPlan(
+		{ eventType: "Delivery", mail: transactionalMail, delivery: { timestamp: "2026-10-04T10:00:02.000Z" } },
+		{ transactionalSet: "transactional" }
+	);
+	assert.equal(plan.messageId, null);
+	assert.deepEqual(plan.transactional, {
+		domain: "notifications.gist.ly",
+		fromAddress: "noreply@notifications.gist.ly",
+		subject: "Your login link",
+		sentAt: new Date("2026-10-04T09:59:59.000Z"),
+		status: "delivered",
+		field: "deliveredAt",
+	});
+});
+
+test("only the transactional configuration set is transactional", () => {
+	const campaign = getSesEventPlan(sesEvent("Delivery", {}), { transactionalSet: "transactional" });
+	assert.equal(campaign.transactional, undefined);
+	const unset = getSesEventPlan({ eventType: "Delivery", mail: transactionalMail, delivery: {} });
+	assert.equal(unset.transactional, undefined);
+});
+
+test("transactional bounces: hard ones bounce and suppress, soft ones only note the error", () => {
+	const options = { transactionalSet: "transactional" };
+	const hard = getSesEventPlan(
+		{ eventType: "Bounce", mail: transactionalMail, bounce: { bounceType: "Permanent", bounceSubType: "NoEmail" } },
+		options
+	);
+	assert.equal(hard.transactional.status, "bounced");
+	assert.equal(hard.transactional.field, "bouncedAt");
+	assert.deepEqual(hard.suppression.emails, ["reader@gmail.com"]);
+
+	const soft = getSesEventPlan(
+		{ eventType: "Bounce", mail: transactionalMail, bounce: { bounceType: "Transient", bounceSubType: "MailboxFull" } },
+		options
+	);
+	assert.equal(soft.transactional.status, "sent");
+	assert.equal(soft.transactional.field, null);
+	assert.match(soft.error, /Soft bounce: MailboxFull/);
+});
