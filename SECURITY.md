@@ -11,7 +11,7 @@ Mailcheap is provided as is, with no security support and no promise of fixes. I
 - Every dashboard page, API route and server action checks the session. Public routes are limited to what readers, mail providers, AWS SNS and QStash need.
 - API keys are stored as SHA-256 hashes and can be revoked.
 - Unsubscribe, confirmation, "keep sending it" and tracking links are signed with keys derived from `SESSION_SECRET`. Rotating it logs you out and breaks those links in emails already sent.
-- SES webhooks only accept messages signed by AWS SNS for the topic in `SES_SNS_TOPIC_ARN`, with certificates from `https://sns.<region>.amazonaws.com/SimpleNotificationService-*.pem` only. Background jobs only run when QStash signed the request (except in `next dev`).
+- SES webhooks only accept messages signed by AWS SNS for the topic in `SES_SNS_TOPIC_ARN`, with certificates from `https://sns.<region>.amazonaws.com/SimpleNotificationService-*.pem` only. Background jobs only run when QStash signed the request with the server's own signing keys, whatever `QSTASH_DEV` says (except in `next dev`); any other request answers 403.
 - Public endpoints (signup form, signup API, unsubscribe, views, login) are rate limited. With Upstash Redis the limits are shared across server instances; without it, or while it errors or times out, each instance counts in memory.
 - Issue HTML shown inline on the archive goes through an allowlist cleaner, then `sanitize-html`, every time the page renders. HTML issues, including every one created through the API, render in a sandboxed iframe without scripts.
 - Every response carries a Content Security Policy (no framing, no plugins, no inline event handlers, forms and `<base>` limited to the app's origin) and HSTS.
