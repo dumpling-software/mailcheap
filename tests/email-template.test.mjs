@@ -37,11 +37,16 @@ test("inlined rules come after existing styles, and buttons skip the rules for e
 		'<h2>Hi</h2><p style="margin:0">Text <a href="#">link</a></p><td class="btn-cell" style="background:#000"><a class="btn" href="#">Go</a></td>',
 		css
 	);
-	assert.ok(html.includes('<h2 style="color: #000;font-size: 24px">'));
+	assert.ok(html.includes('<h2 style="color: #000;font-size: 24px;margin-top:0">'));
 	assert.ok(html.includes('<p style="margin:0;color: #363636">'));
 	assert.ok(html.includes('<a style="color: #363636" href="#">link</a>'));
 	assert.ok(html.includes('class="btn-cell" style="background:#000;background: #6466F1"'));
 	assert.ok(html.includes('<a style="color: #ffffff;text-decoration: none" class="btn" href="#">Go</a>'));
+});
+
+test("only the first element loses its top margin, so an opening heading sits at the top", () => {
+	const html = inlineTemplateStyles("\n<h2>One</h2><h2>Two</h2>", css);
+	assert.equal(html, '\n<h2 style="color: #000;font-size: 24px;margin-top:0">One</h2><h2 style="color: #000;font-size: 24px">Two</h2>');
 });
 
 test("applyTemplate fills the slots and keeps $ in the content as written", () => {
@@ -61,7 +66,7 @@ test("a product with a template renders Markdown into it, with the footer and pr
 		newsletter,
 	});
 	assert.ok(html.includes("<title>News &amp; more</title>"));
-	assert.ok(html.includes('<h2 style="color: #000;font-size: 24px">Studio</h2>'));
+	assert.ok(html.includes('<h2 style="color: #000;font-size: 24px;margin-top:0">Studio</h2>'));
 	assert.match(html, /<td class="btn-cell" style="[^"]*background: #6466F1">/);
 	assert.ok(html.includes(UNSUBSCRIBE_PLACEHOLDER));
 	assert.ok(html.includes("Kollwitzstrasse 76"));
