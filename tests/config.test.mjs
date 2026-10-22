@@ -12,6 +12,14 @@ test("SESSION_SECRET needs 32 characters and ADMIN_PASSWORD 12", () => {
 	assert.equal(getConfigProblems({}).length, 2, "missing counts as too short");
 });
 
+test("SESSION_SECRET_PREVIOUS is optional but needs 32 characters when set", () => {
+	assert.deepEqual(getConfigProblems({ ...STRONG, SESSION_SECRET_PREVIOUS: "o".repeat(32) }), []);
+	assert.match(
+		getConfigProblems({ ...STRONG, SESSION_SECRET_PREVIOUS: "o".repeat(31) }).join(),
+		/SESSION_SECRET_PREVIOUS must be at least 32/
+	);
+});
+
 test("the server doesn't start with a short secret or password", () => {
 	const previous = { ...process.env };
 	try {

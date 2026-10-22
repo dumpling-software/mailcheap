@@ -7,10 +7,10 @@ process.env.ADMIN_EMAIL = "admin@example.com";
 process.env.ADMIN_PASSWORD = "correct horse battery staple";
 
 const { SESSION_COOKIE, SESSION_MAX_AGE, signSessionToken, verifySessionToken } = await import("../lib/session-token.js");
-const { createUnsubscribeToken } = await import("../lib/unsubscribe.js");
-const { getClickUrl, getOpenUrl } = await import("../lib/tracking.js");
-const { createConfirmToken } = await import("../lib/confirmation.js");
-const { createKeepToken } = await import("../lib/last-chance.js");
+const { createUnsubscribeToken, verifyUnsubscribeToken } = await import("../lib/unsubscribe.js");
+const { getClickUrl, getOpenUrl, readClickToken, readOpenToken } = await import("../lib/tracking.js");
+const { createConfirmToken, verifyConfirmToken } = await import("../lib/confirmation.js");
+const { createKeepToken, verifyKeepToken } = await import("../lib/last-chance.js");
 
 async function withEnv(values, run) {
 	const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
@@ -89,6 +89,39 @@ test("email links keep their signatures", () => {
 		createKeepToken(ids, at),
 		"eyJjIjoiNjVmMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMTAwMDAwMDAwIiwibiI6IjY1ZjAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDIwMDAwMDAwMCIsInQiOjE3OTA4MTI4MDB9.YbmpRxagrJ1RaybWAMS5jM-Fmz0XRyibvMg3HYJe8G4"
 	);
+});
+
+test("after a rotation, email links signed with SESSION_SECRET_PREVIOUS still verify, sessions don't", async () => {
+	const ids = { contactId: "65f00000-0000-0000-0000-000100000000", newsletterId: "65f00000-0000-0000-0000-000200000000" };
+	const messageId = "65f00000-0000-0000-0000-000300000000";
+	const old = {
+		unsubscribe: createUnsubscribeToken(ids),
+		confirm: createConfirmToken(ids),
+		keep: createKeepToken(ids),
+		open: getOpenUrl("https://app.example.com", messageId).split("/").pop(),
+		click: getClickUrl("https://app.example.com", messageId, "https://example.com/a").split("/").pop(),
+		session: await signSessionToken("admin@example.com"),
+	};
+	const verifyAll = async () => ({
+		unsubscribe: verifyUnsubscribeToken(old.unsubscribe),
+		confirm: verifyConfirmToken(old.confirm),
+		keep: verifyKeepToken(old.keep),
+		open: readOpenToken(old.open),
+		click: readClickToken(old.click).isSigned,
+		session: await verifySessionToken(old.session),
+	});
+
+	await withEnv({ SESSION_SECRET: "t".repeat(40), SESSION_SECRET_PREVIOUS: process.env.SESSION_SECRET }, async () => {
+		assert.deepEqual(await verifyAll(), { unsubscribe: ids, confirm: ids, keep: ids, open: messageId, click: true, session: null });
+		assert.notEqual(createUnsubscribeToken(ids), old.unsubscribe, "new links are signed with SESSION_SECRET");
+		assert.deepEqual(verifyUnsubscribeToken(createUnsubscribeToken(ids)), ids);
+	});
+	await withEnv({ SESSION_SECRET: "t".repeat(40) }, async () => {
+		assert.deepEqual(await verifyAll(), { unsubscribe: null, confirm: null, keep: null, open: null, click: false, session: null });
+	});
+	await withEnv({ SESSION_SECRET: "t".repeat(40), SESSION_SECRET_PREVIOUS: "u".repeat(40) }, async () => {
+		assert.equal(verifyUnsubscribeToken(old.unsubscribe), null, "only the configured previous secret counts");
+	});
 });
 
 test("production keeps the session in a __Host- cookie", async () => {
