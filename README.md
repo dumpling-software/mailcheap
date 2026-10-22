@@ -245,7 +245,8 @@ The designs for our products live in `templates/`. `node templates/build.mjs` re
 | `ADMIN_EMAIL` | Yes | Dashboard login, and where test emails and alerts go |
 | `ADMIN_PASSWORD` | Without Access | Dashboard password, 12+ characters. Changing it signs out every session. |
 | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | No | Sign in through Cloudflare Access instead of the password (see Optional) |
-| `SESSION_SECRET` | Yes | Signs sessions and email links. 32+ random characters. Changing it breaks links in sent emails. |
+| `SESSION_SECRET` | Yes | Signs sessions and email links. 32+ random characters. Changing it breaks links in sent emails, unless the old value moves to `SESSION_SECRET_PREVIOUS`. |
+| `SESSION_SECRET_PREVIOUS` | No | The secret before the last rotation. Links in emails signed with it keep working; sessions don't. |
 | `APP_URL` | On other hosts | Public URL of the app. On Vercel it defaults to the production domain. |
 | `SENDING_ENABLED` | To send | Nothing is sent unless it's `true` |
 | `SES_REGION` | To send | SES region, `us-east-1` by default |
