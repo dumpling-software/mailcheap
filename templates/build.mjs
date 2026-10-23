@@ -4,18 +4,24 @@ import fs from "node:fs";
 
 const AVATAR = "https://txniotmoskghmzfqvplz.supabase.co/storage/v1/object/public/uploads/mailerlite/kp4MQOwL9maVOofFD1iOM5hSwAoDciZC2vsjIKxF-1f836950c471.jpg";
 
-function layout({ font, fontLink, border, radius, background = "#ffffff", signature, bio }) {
+// text, muted and rule color the body, the signature and the line above it. logo ({ src, width,
+// height, alt, href }) puts a picture above the text.
+function layout({ font, fontLink, border, radius, background = "#ffffff", signature, bio, logo, text = "#515856", muted = "#7f8c8d", rule = "#000000" }) {
 	const card = bio
 		? `
-<tr><td class="row" style="padding:48px 50px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #000000;font-size:0;line-height:0;">&nbsp;</td></tr></table></td></tr>
-<tr><td class="row" style="padding:24px 50px 0;font-family:${font};font-size:16px;line-height:1.65;color:#7f8c8d;">${signature}</td></tr>
+<tr><td class="row" style="padding:48px 50px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid ${rule};font-size:0;line-height:0;">&nbsp;</td></tr></table></td></tr>
+<tr><td class="row" style="padding:24px 50px 0;font-family:${font};font-size:16px;line-height:1.65;color:${muted};">${signature}</td></tr>
 <tr><td class="row" style="padding:24px 50px 40px;">
 <table role="presentation" cellpadding="0" cellspacing="0"><tr>
 <td width="80" valign="top"><img src="${AVATAR}" width="80" height="80" alt="Rafal" style="display:block;width:80px;height:80px;border-radius:80px;"></td>
 <td width="24"></td>
-<td valign="middle" style="font-family:${font};font-size:14px;line-height:1.65;color:#515856;">${bio}</td>
+<td valign="middle" style="font-family:${font};font-size:14px;line-height:1.65;color:${text};">${bio}</td>
 </tr></table>
 </td></tr>`
+		: "";
+	const header = logo
+		? `
+<tr><td class="row" style="padding:40px 50px 0;"><a href="${logo.href}" style="text-decoration:none;"><img src="${logo.src}" width="${logo.width}" height="${logo.height}" alt="${logo.alt}" style="display:block;border:0;width:${logo.width}px;height:${logo.height}px;"></a></td></tr>`
 		: "";
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -37,8 +43,8 @@ table { border-collapse: collapse; }
 <body style="margin:0;padding:0;background:${background};">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${background};">
 <tr><td align="center" style="padding:20px 8px;">
-<table role="presentation" class="wrapper" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff;${border ? `border:1px solid ${border};border-collapse:separate;` : ""}${radius ? `border-radius:${radius};border-collapse:separate;overflow:hidden;` : ""}">
-<tr><td class="row" style="padding:${border || bio ? "48px 50px 16px" : "16px 20px"};font-family:${font};font-size:${bio ? 16 : 14}px;line-height:1.65;color:${bio ? "#515856" : "#000000"};">
+<table role="presentation" class="wrapper" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff;${border ? `border:1px solid ${border};border-collapse:separate;` : ""}${radius ? `border-radius:${radius};border-collapse:separate;overflow:hidden;` : ""}">${header}
+<tr><td class="row" style="padding:${border || bio ? `${logo ? 32 : 48}px 50px 16px` : "16px 20px"};font-family:${font};font-size:${bio ? 16 : 14}px;line-height:1.65;color:${bio ? text : "#000000"};">
 {{content}}
 </td></tr>${card}
 </table>
@@ -55,7 +61,9 @@ table { border-collapse: collapse; }
 // Spacing follows the MailerLite originals: paragraphs 16px with 1.65 line height and room between
 // them, and wide gaps around pictures, lists and buttons. A title that opens the email (.title) has
 // more room under it than a section heading.
-function css({ heading, headingFont, h1, titleGap, h2, link, button, buttonRadius, buttonWeight = "normal", image }) {
+// codeFont and codeBackground style inline code, also inside code blocks: pre styles those, and only
+// templates that set it get a rule for them.
+function css({ heading, headingFont, h1, titleGap, h2, link, button, buttonRadius, buttonWeight = "normal", image, codeFont = "ui-monospace, Menlo, monospace", codeBackground = "#f4f4f5", rule = "#d1d3d3", pre }) {
 	const font = headingFont ? ` font-family: ${headingFont};` : "";
 	return `.body p { margin: 0 0 20px; }
 .body h1, .title { margin: 40px 0 20px; font-size: ${h1}px; line-height: 1.25; font-weight: 700; color: ${heading};${font} }
@@ -69,9 +77,10 @@ function css({ heading, headingFont, h1, titleGap, h2, link, button, buttonRadiu
 .caption { margin: 0 0 36px; font-size: 13px; line-height: 1.65; font-weight: bold; }
 .body ul, .body ol { margin: 32px 0; padding-left: 24px; }
 .body li { margin: 0 0 4px; }
-.body blockquote { margin: 0 0 20px; padding-left: 16px; border-left: 3px solid #d1d3d3; color: #515856; }
-.body code { font-family: ui-monospace, Menlo, monospace; font-size: 14px; background: #f4f4f5; padding: 2px 4px; }
-.body hr { border: 0; border-top: 1px solid #d1d3d3; margin: 40px 0; }
+.body blockquote { margin: 0 0 20px; padding-left: 16px; border-left: 3px solid ${rule}; color: #515856; }
+.body code { font-family: ${codeFont}; font-size: 14px; background: ${codeBackground}; padding: 2px 4px; }
+${pre ? `.body pre { margin: 0 0 20px; padding: 14px 16px; background: ${pre.background}; color: ${pre.color}; border-left: 3px solid ${pre.accent}; border-radius: ${pre.radius}; font-family: ${codeFont}; font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+` : ""}.body hr { border: 0; border-top: 1px solid ${rule}; margin: 40px 0; }
 .btn-table { margin: 36px 0 56px; }
 .btn-table-center { margin: 36px auto 56px; }
 .btn-cell { border-radius: ${buttonRadius}; background: ${button}; }
@@ -124,6 +133,38 @@ const PRODUCTS = {
 			button: "#a855f7",
 			buttonRadius: "6px",
 			image: "6px",
+		},
+	},
+	// AppGoat: the site's paper, ink and lime. A white card with a hairline on paper, the wordmark on
+	// top, Outfit text, JetBrains Mono code and ink buttons.
+	appgoat: {
+		layout: {
+			font: "'Outfit',Helvetica,Arial,sans-serif",
+			fontLink: "https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+			border: "#ECEAE3",
+			radius: "16px",
+			background: "#FBFAF7",
+			text: "#0E0E10",
+			muted: "#6B6860",
+			rule: "#ECEAE3",
+			logo: { src: "https://appgoat.ai/brand/appgoat-wordmark-dark-ink@1200.png", width: 120, height: 40, alt: "AppGoat", href: "https://appgoat.ai" },
+			signature: "- Rafal from AppGoat -",
+			bio: "Hi, I am Rafal - the founder of AppGoat.<br>I built it to give makers like you App Store and Google Play data your agents can use. Hope you find AppGoat helpful!",
+		},
+		css: {
+			heading: "#0E0E10",
+			h1: 28,
+			titleGap: 28,
+			h2: 22,
+			link: "#0E0E10",
+			button: "#0E0E10",
+			buttonRadius: "10px",
+			buttonWeight: "600",
+			image: "12px",
+			codeFont: "'JetBrains Mono',ui-monospace,Menlo,monospace",
+			codeBackground: "#F3F1EA",
+			rule: "#ECEAE3",
+			pre: { background: "#F3F1EA", color: "#0E0E10", accent: "#C6F432", radius: "6px" },
 		},
 	},
 };
