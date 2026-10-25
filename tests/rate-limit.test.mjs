@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isLimitedInMemory, isRateLimited } from "../lib/rate-limit.js";
+import { getClientIp, isLimitedInMemory, isRateLimited } from "../lib/rate-limit.js";
 
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -46,4 +46,15 @@ test("memory limits open again once the window has passed", () => {
 	assert.equal(isLimitedInMemory({ ...limits, key: "a" }, start + 1000), false);
 	assert.equal(isLimitedInMemory({ ...limits, key: "a" }, start + 2000), true);
 	assert.equal(isLimitedInMemory({ ...limits, key: "a" }, start + 10 * 60_000 + 1000), false);
+});
+
+test("the client IP is the one the host's proxy saw, not the first one the client wrote", () => {
+	const spoofed = new Headers({ "x-forwarded-for": "6.6.6.6, 203.0.113.7", "x-real-ip": "203.0.113.9" });
+	assert.equal(getClientIp(spoofed, {}), "203.0.113.7", "proxies append the address they saw");
+	assert.equal(getClientIp(spoofed, { VERCEL: "1" }), "203.0.113.9", "Vercel sets x-real-ip");
+	assert.equal(getClientIp(new Headers({ "x-real-ip": "203.0.113.9" }), {}), "203.0.113.9");
+	const behindCloudflare = new Headers({ "cf-connecting-ip": "198.51.100.1", "x-forwarded-for": "6.6.6.6" });
+	assert.equal(getClientIp(behindCloudflare, { CLIENT_IP_HEADER: "CF-Connecting-IP" }), "198.51.100.1");
+	assert.equal(getClientIp(new Headers(), { CLIENT_IP_HEADER: "cf-connecting-ip" }), "unknown");
+	assert.equal(getClientIp(new Headers(), {}), "unknown");
 });

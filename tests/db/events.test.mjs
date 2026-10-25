@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { eq } from "drizzle-orm";
 import { generateApiKey } from "../../lib/api-keys.js";
-import { apiKeys, contactEvents, contacts, messages, suppressions } from "../../lib/db.js";
+import { apiKeys, contactEvents, contacts, events, messages, suppressions } from "../../lib/db.js";
+import { handleSesEvent } from "../../lib/ses-events.js";
 import { createTestDb, seedContact, seedNewsletter } from "../helpers/db.mjs";
 
 process.env.SESSION_SECRET = "s".repeat(40);
@@ -113,4 +114,36 @@ test("erasing a contact removes it, its events and its address on messages, ever
 	const everywhere = await DELETE(request("DELETE", "/api/v1/contacts", { email: "gdpr@example.com" }));
 	assert.deepEqual(await everywhere.json(), { deleted: 1 });
 	assert.equal((await db.select().from(suppressions).where(eq(suppressions.email, "gdpr@example.com"))).length, 0);
+});
+
+test("SES events that arrive after an erasure don't write the address back", async (t) => {
+	t.mock.method(console, "error", () => {});
+	const { DELETE } = await import("../../app/api/v1/contacts/route.js");
+	const { db } = testDb;
+	const email = "late@example.com";
+	const contact = await seedContact(db, supadata, { email });
+	const [message] = await db
+		.insert(messages)
+		.values({ kind: "welcome", newsletterId: supadata._id, contactId: contact._id, email, sesMessageId: "ses-late", sentAt: new Date() })
+		.returning();
+	await DELETE(request("DELETE", "/api/v1/contacts", { email }));
+
+	const mail = { messageId: "ses-late", destination: [email], tags: { message_id: [message._id] } };
+	await handleSesEvent({
+		eventType: "Bounce",
+		mail,
+		bounce: { bounceType: "Permanent", bounceSubType: "General", bouncedRecipients: [{ emailAddress: email, diagnosticCode: `550 ${email} unknown` }] },
+	});
+	await handleSesEvent({ eventType: "Complaint", mail, complaint: { complainedRecipients: [{ emailAddress: email }], complaintFeedbackType: "abuse" } });
+
+	assert.equal((await db.select().from(suppressions).where(eq(suppressions.email, email))).length, 0);
+	const recorded = await db.select().from(events).where(eq(events.sesMessageId, "ses-late"));
+	assert.equal(recorded.length, 2, "the events still count");
+	for (const event of recorded) {
+		assert.equal(event.email, "erased@invalid");
+		assert.ok(!JSON.stringify(event.data).includes(email));
+	}
+	const [after] = await db.select().from(messages).where(eq(messages._id, message._id));
+	assert.equal(after.status, "complained");
+	assert.ok(!String(after.error).includes(email));
 });

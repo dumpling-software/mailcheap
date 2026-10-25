@@ -1,6 +1,6 @@
 "use server";
 
-import { isUuid } from "@/lib/validation";
+import { isUuid, toHeaderLine } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { notifyActivity } from "@/lib/alerts";
@@ -81,7 +81,7 @@ export async function saveCampaign(id, values) {
 	const isSaved = await updateCampaign(
 		campaign._id,
 		{
-			subject: String(values?.subject ?? "").slice(0, MAX_SUBJECT_LENGTH),
+			subject: toHeaderLine(values?.subject).slice(0, MAX_SUBJECT_LENGTH),
 			previewText: String(values?.previewText ?? "").slice(0, 300),
 			format,
 			...(isMarkdown ? { markdown: body, html: "" } : { html: body, markdown: "" }),
