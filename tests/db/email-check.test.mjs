@@ -68,6 +68,17 @@ test("the lists, then the service, then DNS decide, and each domain is looked up
 	assert.equal((await checkEmail("not an email")).reason, "invalid");
 });
 
+test("a domain no service could judge goes through on its mail server, unsaved, and stays pending in a sweep", async () => {
+	setEmailCheckLookups({
+		loadList: async () => new Set(),
+		checkWithService: async () => null,
+		lookUpMailServer: async () => ({ verdict: "ok", source: "dns" }),
+	});
+	assert.equal((await checkEmail("dana@throttled.example")).accepted, true);
+	assert.equal((await testDb.db.select().from(emailDomainChecks).where(eq(emailDomainChecks.domain, "throttled.example"))).length, 0);
+	assert.deepEqual(await checkDomains(["throttled.example"]), { "throttled.example": null });
+});
+
 test("when nothing answers the address goes through, and nothing is saved", async () => {
 	const result = await checkEmail("dana@down.example");
 	assert.equal(result.accepted, true);
