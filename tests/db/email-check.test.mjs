@@ -156,6 +156,8 @@ test("the domains API sweeps up to 1000 domains and counts what's pending", asyn
 	assert.deepEqual(Object.keys(results).sort(), ["gmail.com", "lugiz.com"]);
 	assert.equal(results["lugiz.com"].verdict, "disposable");
 	assert.equal(pending, 0);
+	const quick = await (await POST(apiRequest("/api/v1/email-check/domains", { domains: ["fresh.example"], wait: 0 }))).json();
+	assert.deepEqual(quick, { results: { "fresh.example": null }, pending: 1 });
 	const tooMany = await POST(apiRequest("/api/v1/email-check/domains", { domains: Array.from({ length: 1001 }, (_, i) => `d${i}.com`) }));
 	assert.equal(tooMany.status, 400);
 });

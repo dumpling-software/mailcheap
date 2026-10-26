@@ -300,7 +300,7 @@ curl -X POST https://<your-app>/api/v1/email-check \
   -d '{"email":"jane@example.com"}'
 ```
 
-**Sweep existing users**: `POST /api/v1/email-check/domains` with `{ "domains": [...] }` (up to 1,000) answers `{ results, pending }`: each domain's `{ verdict, source }`, where `verdict` is `ok`, `disposable`, `no_mail_server`, or `blocked`/`allowed` by a rule. Domains still being looked up after 20 seconds come back `null`; call again for them. verifymail.io is skipped unless you pass `"verifymail": true`, so a sweep doesn't use up its daily quota.
+**Sweep existing users**: `POST /api/v1/email-check/domains` with `{ "domains": [...] }` (up to 1,000) answers `{ results, pending }`: each domain's `{ verdict, source }`, where `verdict` is `ok`, `disposable`, `no_mail_server`, or `blocked`/`allowed` by a rule. Domains still being looked up after `wait` seconds (0 to 20, default 20; 0 answers only from rules, saved verdicts and the lists) come back `null`; call again for them. verifymail.io is skipped unless you pass `"verifymail": true`, so a sweep doesn't use up its daily quota.
 
 **Record an event**: `POST /api/v1/events` with `newsletter`, `email`, `name` (like `api_key_created`), and optional `properties` and `occurredAt` (ISO date, last 30 days). Creates the contact if the newsletter doesn't have it yet (`source: "api"`), then starts or wakes the automations that wait for it. Answers `201` with `{ id, contactId, contactStatus, created }`.
 
