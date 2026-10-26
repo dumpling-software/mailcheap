@@ -36,6 +36,7 @@ const STATUS_TONES = {
 	success: "green",
 	verified: "green",
 	healthy: "green",
+	allowed: "green",
 	scheduled: "blue",
 	sending: "blue",
 	queued: "blue",
@@ -49,4 +50,5 @@ const STATUS_TONES = {
 	complained: "red",
 	failed: "red",
 	shutdown: "red",
+	blocked: "red",
 };

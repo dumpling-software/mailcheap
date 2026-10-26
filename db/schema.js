@@ -286,6 +286,35 @@ export const suppressions = pgTable(
 	(t) => [uniqueIndex("suppressions_email_key").on(t.email)]
 );
 
+// Signup email checks (lib/email-check.js). Rules are the account's own: a domain (and its subdomains) or
+// an address (any +tag) to block, or to allow past the disposable check.
+export const emailRules = pgTable(
+	"email_rules",
+	{
+		_id: id(),
+		kind: text().notNull(),
+		value: text().notNull(),
+		action: text().notNull(),
+		note: text(),
+		...timestamps(),
+	},
+	(t) => [uniqueIndex("email_rules_kind_value_key").on(t.kind, t.value)]
+);
+
+// What a domain turned out to be (ok, disposable or no_mail_server) and who said so, until expiresAt.
+export const emailDomainChecks = pgTable(
+	"email_domain_checks",
+	{
+		_id: id(),
+		domain: text().notNull(),
+		verdict: text().notNull(),
+		source: text().notNull(),
+		expiresAt: at("expires_at").notNull(),
+		...timestamps(),
+	},
+	(t) => [uniqueIndex("email_domain_checks_domain_key").on(t.domain)]
+);
+
 export const apiKeys = pgTable(
 	"api_keys",
 	{

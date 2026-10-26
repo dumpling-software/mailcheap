@@ -10,6 +10,7 @@ import { getInbox } from "@/lib/inbox-links";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { queueConfirmationEmail, queueWelcomeEmail } from "@/lib/sending";
 import { normalizeEmail } from "@/lib/validation";
+import { checkNewSignup } from "@/lib/email-check";
 import { findNewsletterBySlug } from "@/lib/records";
 
 const PER_IP = { name: "subscribe-ip", limit: 5, window: "10 m" };
@@ -42,6 +43,9 @@ export async function subscribe(_state, formData) {
 			})
 		);
 	}
+
+	const refused = await checkNewSignup({ newsletter, email });
+	if (refused) return { error: refused.message };
 
 	const { contact, created } = await upsertContact({ newsletter, email, source: "website", resubscribe: true });
 	const isPending = contact.status === "pending";
