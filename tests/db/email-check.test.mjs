@@ -3,7 +3,7 @@ import { after, before, beforeEach, test } from "node:test";
 import { eq } from "drizzle-orm";
 import { generateApiKey } from "../../lib/api-keys.js";
 import { apiKeys, contacts, emailDomainChecks, emailRules } from "../../lib/db.js";
-import { checkEmail, setEmailCheckLookups } from "../../lib/email-check.js";
+import { checkDomains, checkEmail, setEmailCheckLookups } from "../../lib/email-check.js";
 import { createTestDb, seedContact, seedNewsletter } from "../helpers/db.mjs";
 
 process.env.SESSION_SECRET = "s".repeat(40);
@@ -26,8 +26,9 @@ beforeEach(async () => {
 	calls = { service: [], mx: [] };
 	setEmailCheckLookups({
 		loadList: async () => new Set(["playfine.com"]),
-		checkWithService: async (domain) => {
+		checkWithService: async (domain, { paid } = {}) => {
 			calls.service.push(domain);
+			calls.paid = paid;
 			if (domain === "down.example") return null;
 			return { verdict: ["lugiz.com", "kiwof.com"].includes(domain) ? "disposable" : "ok", source: "verifymail" };
 		},
@@ -121,4 +122,40 @@ test("the contacts API refuses new disposable signups but keeps updating contact
 		apiRequest("/api/v1/contacts", { newsletter: "check-weekly", email: "old@lugiz.com", properties: { plan: "pro" } })
 	);
 	assert.equal(updated.status, 200);
+});
+
+test("a sweep answers rules, lists and saved verdicts at once, looks up the rest, and leaves what's late pending", async () => {
+	await testDb.db.insert(emailRules).values([
+		{ kind: "domain", value: "agentmail.to", action: "allow" },
+		{ kind: "domain", value: "powerscrews.com", action: "block" },
+	]);
+	await checkEmail("x@kiwof.com");
+	calls.service = [];
+
+	const results = await checkDomains(["agentmail.to", "powerscrews.com", "29.playfine.com", "kiwof.com", "lugiz.com", "gmail.com"], {
+		paid: false,
+	});
+	assert.deepEqual(results["agentmail.to"], { verdict: "allowed", source: "rule" });
+	assert.deepEqual(results["powerscrews.com"], { verdict: "blocked", source: "rule" });
+	assert.deepEqual(results["29.playfine.com"], { verdict: "disposable", source: "list" });
+	assert.deepEqual(results["kiwof.com"], { verdict: "disposable", source: "verifymail" });
+	assert.equal(results["lugiz.com"].verdict, "disposable");
+	assert.equal(results["gmail.com"].verdict, "ok");
+	assert.deepEqual(calls.service.sort(), ["gmail.com", "lugiz.com"]);
+	assert.equal(calls.paid, false);
+
+	const late = await checkDomains(["late.example", "later.example"], { deadline: Date.now() - 1 });
+	assert.deepEqual(late, { "late.example": null, "later.example": null });
+});
+
+test("the domains API sweeps up to 1000 domains and counts what's pending", async () => {
+	const { POST } = await import("../../app/api/v1/email-check/domains/route.js");
+	const response = await POST(apiRequest("/api/v1/email-check/domains", { domains: ["Lugiz.com", "gmail.com", "not a domain"] }));
+	assert.equal(response.status, 200);
+	const { results, pending } = await response.json();
+	assert.deepEqual(Object.keys(results).sort(), ["gmail.com", "lugiz.com"]);
+	assert.equal(results["lugiz.com"].verdict, "disposable");
+	assert.equal(pending, 0);
+	const tooMany = await POST(apiRequest("/api/v1/email-check/domains", { domains: Array.from({ length: 1001 }, (_, i) => `d${i}.com`) }));
+	assert.equal(tooMany.status, 400);
 });
