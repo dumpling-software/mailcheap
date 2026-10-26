@@ -364,6 +364,9 @@ export const automations = pgTable(
 		// Can a contact go through again once they finished?
 		allowReentry: boolean().notNull().default(false),
 		pausedReason: text(),
+		// When it last became active: its health counts emails sent since, so a resume after fixing the
+		// cause isn't paused again by the bounces that paused it.
+		activatedAt: at("activated_at"),
 		// Totals from an import (the previous platform's numbers).
 		stats: jsonb().notNull().default({}),
 		...external(),

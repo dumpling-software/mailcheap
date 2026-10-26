@@ -208,4 +208,12 @@ test("an automation whose emails bounce too often pauses itself", async () => {
 	const [paused] = await testDb.db.select().from(automations).where(eq(automations._id, automation._id));
 	assert.equal(paused.status, "paused");
 	assert.match(paused.pausedReason, /bounce rate/);
+
+	// Resumed after the cause is fixed: the bounces from before don't count, so one more doesn't pause it.
+	const resumedAt = new Date(Date.now() + 1000);
+	await testDb.db.update(automations).set({ status: "active", pausedReason: null, activatedAt: resumedAt }).where(eq(automations._id, automation._id));
+	await testDb.db.insert(messages).values({ ...rows[0], email: "late@example.com", sentAt: new Date(resumedAt.getTime() + 1000) });
+	assert.equal(await checkAutomationHealth(automation._id), null);
+	const [still] = await testDb.db.select().from(automations).where(eq(automations._id, automation._id));
+	assert.equal(still.status, "active");
 });
