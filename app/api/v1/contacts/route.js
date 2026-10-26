@@ -4,6 +4,7 @@ import { authenticateRequest } from "@/lib/api-keys";
 import { onContactCreated, onPropertiesChanged } from "@/lib/automations/hooks";
 import { isSendingEnabled } from "@/lib/config";
 import { eraseContact, mergeProperties, resolveNewsletter } from "@/lib/contact-events";
+import { checkNewSignup } from "@/lib/email-check";
 import { upsertContact } from "@/lib/contacts";
 import { getInbox } from "@/lib/inbox-links";
 import { readProperties } from "@/lib/properties";
@@ -74,6 +75,10 @@ export async function POST(request) {
 	const resolved = await resolveNewsletter(input.newsletter, apiKey);
 	if (resolved.error) return fail(resolved.status, resolved.error);
 	const { newsletter } = resolved;
+
+	// Disposable and blocked addresses never join; the message is the one to show the person signing up.
+	const refused = await checkNewSignup({ newsletter, email: input.email });
+	if (refused) return NextResponse.json({ error: refused.message, reason: refused.reason }, { status: 422 });
 
 	const { contact: upserted, created } = await upsertContact({
 		newsletter,

@@ -166,6 +166,7 @@ QStash calls `APP_URL/api/jobs/...` to send each batch, so the app has to be rea
 - **Cloudflare Access:** to sign in through Cloudflare Access instead of the password, proxy the app's domain through Cloudflare and protect it with an Access application. Add a second application with a **Bypass** policy (everyone) for the paths recipients, AWS, QStash and API clients reach without a login: `/unsubscribe`, `/confirm`, `/keep`, `/o/*`, `/c/*`, `/api/unsubscribe`, `/api/views`, `/api/v1/*`, `/api/webhooks/*`, `/api/jobs/*` and `/api/health`. Then set `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` (the protected application's audience tag). Mailcheap checks the token Access adds to every request, so the origin's own URL stays closed, and `ADMIN_PASSWORD` is no longer needed. Turn off Cloudflare's Email Address Obfuscation and Rocket Loader for the domain: their scripts break under Mailcheap's Content Security Policy.
 - **Transactional email:** to see the email your other apps send through SES (login links, notifications over SES SMTP) on the **Transactional** page, give those domains their own configuration set. Create one named `transactional` with open and click tracking off (click tracking would rewrite login links), add an event destination to the same SNS topic with sends, deliveries, bounces, complaints, delivery delays, rejects and rendering failures, then make it each domain's default: `aws sesv2 put-email-identity-configuration-set-attributes --email-identity notifications.example.com --configuration-set-name transactional`. The apps need no change. Mailcheap stores one row per email; a hard bounce suppresses the address for newsletters too, a complaint changes no contact. Set `SES_TRANSACTIONAL_CONFIGURATION_SET` if you name the set differently.
 - **Shared rate limits:** create a Redis database in the [Upstash console](https://console.upstash.com/redis) and add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+- **Email checks:** signups (the API, the website form and `POST /api/v1/email-check`) are checked against the rules on the **Email checks** page (block or allow a domain or an address), the community disposable domain lists (refreshed daily), a verification service and DNS. Set `VERIFYMAIL_API_KEY` for [verifymail.io](https://verifymail.io), which caught every domain of a real bot signup wave; without it, DeBounce's free check stands in. Each domain's verdict is saved: disposable for 90 days, fine for 3.
 - **Alerts:** set `ALERT_FROM` (like `Mailcheap <alerts@mail.example.com>`) to get alerts by email at `ADMIN_EMAIL`: spam complaints, paused sends and automations, signup floods and rate limiter outages. Add `ALERT_ACTIVITY=true` to also get every login, new API key and send. Otherwise they only show in the logs.
 
 ## Local development
@@ -265,6 +266,7 @@ The designs for our products live in `templates/`. `node templates/build.mjs` re
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | No | Image uploads to Supabase Storage. `SUPABASE_STORAGE_BUCKET` picks the bucket (`uploads`). |
 | `ALERT_FROM` | No | From address for alert emails, on a verified domain |
 | `ALERT_ACTIVITY` | No | `true` also emails every login, new API key and send |
+| `VERIFYMAIL_API_KEY` | No | verifymail.io key for signup email checks; DeBounce's free check without it |
 
 [`.env.example`](.env.example) has the same list with more detail.
 
@@ -286,6 +288,17 @@ curl -X POST https://<your-app>/api/v1/contacts \
 - Pass your visitor's IP as `ip` to get the per-visitor limit of 5 signups per 10 minutes. Each key is also limited to 600 signups an hour.
 - `properties` (optional) merges into the contact's: strings (up to 500 characters), numbers and booleans, under names like `plan` or `last_name`. `null` removes one. Automations can branch on them.
 - Answers `201` for a new contact, `200` if it already existed, with `{ id, status, created, properties }`. Signing up again never sends the welcome email again. When the newsletter confirms signups, `status` is `pending` and `inbox` links to the reader's email provider for your "check your inbox" message.
+
+New addresses go through the **Email checks** first (below): a disposable, blocked or undeliverable one gets `422` with `{ error, reason }`, where `error` is the sentence to show the person signing up. Contacts the newsletter already has are never refused.
+
+**Check an address before signup**: `POST /api/v1/email-check` with `{ "email": "..." }`, from your app's signup form, before it creates the account. Any key works. Answers `{ email, accepted, reason, message }`: `reason` is `invalid`, `blocked`, `disposable` or `no_mail_server`, and `message` is the sentence to show under the email field. When the lookups can't answer, the address is accepted. Limited to 3,000 checks per key an hour.
+
+```bash
+curl -X POST https://<your-app>/api/v1/email-check \
+  -H "Authorization: Bearer $MAILCHEAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com"}'
+```
 
 **Record an event**: `POST /api/v1/events` with `newsletter`, `email`, `name` (like `api_key_created`), and optional `properties` and `occurredAt` (ISO date, last 30 days). Creates the contact if the newsletter doesn't have it yet (`source: "api"`), then starts or wakes the automations that wait for it. Answers `201` with `{ id, contactId, contactStatus, created }`.
 

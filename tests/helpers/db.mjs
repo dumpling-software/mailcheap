@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import * as schema from "../../db/schema.js";
 import { setDb } from "../../lib/db.js";
+import { setEmailCheckLookups } from "../../lib/email-check.js";
 
 const MIGRATIONS = new URL("../../db/migrations", import.meta.url).pathname;
 
@@ -12,6 +13,12 @@ export async function createTestDb() {
 	const db = drizzle({ client, schema, casing: "snake_case" });
 	await migrate(db, { migrationsFolder: MIGRATIONS });
 	setDb(db);
+	// Signup checks stay offline: no list, no service, every domain has a mail server.
+	setEmailCheckLookups({
+		loadList: async () => new Set(),
+		checkWithService: async () => null,
+		lookUpMailServer: async () => ({ verdict: "ok", source: "dns" }),
+	});
 	return { db, client, close: () => client.close() };
 }
 

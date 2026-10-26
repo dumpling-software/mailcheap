@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Globe, KeyRound, LayoutGrid, Mail, Send, Settings2, Users, Workflow } from "lucide-react";
+import { Globe, KeyRound, LayoutGrid, Mail, Send, Settings2, ShieldCheck, Users, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function NavLinks({ onNavigate }) {
@@ -49,4 +49,5 @@ const NAV_ITEMS = [
 	{ href: "/transactional", label: "Transactional", icon: Mail, heading: "Account" },
 	{ href: "/domains", label: "Domains", icon: Globe },
 	{ href: "/api-keys", label: "API keys", icon: KeyRound },
+	{ href: "/email-checks", label: "Email checks", icon: ShieldCheck },
 ];
