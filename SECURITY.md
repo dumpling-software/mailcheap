@@ -4,7 +4,7 @@ Mailcheap is provided as is, with no security support and no promise of fixes. I
 
 ## What's built in
 
-- One admin login. Login attempts are rate limited per IP, and every login, new API key and send is logged and, with `ALERT_FROM` set, emailed to `ADMIN_EMAIL`.
+- One admin login. Login attempts are rate limited per IP, and every login, new API key and send is logged and, with `ALERT_FROM` and `ALERT_ACTIVITY=true` set, emailed to `ADMIN_EMAIL`.
 - Behind Cloudflare Access (`CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`), every dashboard request needs a valid Access token, checked against the team's keys and the application's audience; the password login is off.
 - Mailcheap refuses to start with a `SESSION_SECRET` under 32 characters, or, without Access, an `ADMIN_PASSWORD` under 12.
 - Sessions last 7 days, in an httpOnly cookie (`__Host-` prefixed in production) signed with a key derived from `SESSION_SECRET`. Changing `ADMIN_PASSWORD` or `ADMIN_EMAIL` signs out every session.
