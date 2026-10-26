@@ -166,7 +166,7 @@ QStash calls `APP_URL/api/jobs/...` to send each batch, so the app has to be rea
 - **Cloudflare Access:** to sign in through Cloudflare Access instead of the password, proxy the app's domain through Cloudflare and protect it with an Access application. Add a second application with a **Bypass** policy (everyone) for the paths recipients, AWS, QStash and API clients reach without a login: `/unsubscribe`, `/confirm`, `/keep`, `/o/*`, `/c/*`, `/api/unsubscribe`, `/api/views`, `/api/v1/*`, `/api/webhooks/*`, `/api/jobs/*` and `/api/health`. Then set `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` (the protected application's audience tag). Mailcheap checks the token Access adds to every request, so the origin's own URL stays closed, and `ADMIN_PASSWORD` is no longer needed. Turn off Cloudflare's Email Address Obfuscation and Rocket Loader for the domain: their scripts break under Mailcheap's Content Security Policy.
 - **Transactional email:** to see the email your other apps send through SES (login links, notifications over SES SMTP) on the **Transactional** page, give those domains their own configuration set. Create one named `transactional` with open and click tracking off (click tracking would rewrite login links), add an event destination to the same SNS topic with sends, deliveries, bounces, complaints, delivery delays, rejects and rendering failures, then make it each domain's default: `aws sesv2 put-email-identity-configuration-set-attributes --email-identity notifications.example.com --configuration-set-name transactional`. The apps need no change. Mailcheap stores one row per email; a hard bounce suppresses the address for newsletters too, a complaint changes no contact. Set `SES_TRANSACTIONAL_CONFIGURATION_SET` if you name the set differently.
 - **Shared rate limits:** create a Redis database in the [Upstash console](https://console.upstash.com/redis) and add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
-- **Alerts:** set `ALERT_FROM` (like `Mailcheap <alerts@mail.example.com>`) to get alerts by email at `ADMIN_EMAIL`: spam complaints, paused sends, signup floods and rate limiter outages, plus every login, new API key and send. Otherwise they only show in the logs.
+- **Alerts:** set `ALERT_FROM` (like `Mailcheap <alerts@mail.example.com>`) to get alerts by email at `ADMIN_EMAIL`: spam complaints, paused sends and automations, signup floods and rate limiter outages. Add `ALERT_ACTIVITY=true` to also get every login, new API key and send. Otherwise they only show in the logs.
 
 ## Local development
 
@@ -263,6 +263,7 @@ The designs for our products live in `templates/`. `node templates/build.mjs` re
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | No | Shared rate limits |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | No | Image uploads to Supabase Storage. `SUPABASE_STORAGE_BUCKET` picks the bucket (`uploads`). |
 | `ALERT_FROM` | No | From address for alert emails, on a verified domain |
+| `ALERT_ACTIVITY` | No | `true` also emails every login, new API key and send |
 
 [`.env.example`](.env.example) has the same list with more detail.
 
