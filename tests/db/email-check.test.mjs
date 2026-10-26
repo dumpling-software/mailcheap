@@ -25,12 +25,15 @@ beforeEach(async () => {
 	await testDb.db.delete(emailDomainChecks);
 	calls = { service: [], mx: [] };
 	setEmailCheckLookups({
-		loadList: async () => new Set(["playfine.com"]),
-		checkWithService: async (domain, { paid } = {}) => {
-			calls.service.push(domain);
+		loadList: async () => ({
+			strict: new Set(["playfine.com"]),
+			loose: new Set(["salemkeizer.org", "wapium.com", "hutdot.com"]),
+		}),
+		checkWithService: async (domain, { paid, only } = {}) => {
+			calls.service.push(only ? `${only}:${domain}` : domain);
 			calls.paid = paid;
-			if (domain === "down.example") return null;
-			return { verdict: ["lugiz.com", "kiwof.com"].includes(domain) ? "disposable" : "ok", source: "verifymail" };
+			if (domain === "down.example" || domain === "hutdot.com") return null;
+			return { verdict: ["lugiz.com", "kiwof.com", "wapium.com"].includes(domain) ? "disposable" : "ok", source: "verifymail" };
 		},
 		lookUpMailServer: async (domain) => {
 			calls.mx.push(domain);
@@ -39,6 +42,20 @@ beforeEach(async () => {
 			return { verdict: "ok", source: "dns" };
 		},
 	});
+});
+
+test("a domain only the loose list has is settled by verifymail, or blocked when it can't answer", async () => {
+	assert.equal((await checkEmail("717256@salemkeizer.org")).accepted, true);
+	assert.equal((await checkEmail("duc@wapium.com")).reason, "disposable");
+	const unanswered = await checkEmail("a@hutdot.com");
+	assert.equal(unanswered.reason, "disposable");
+	assert.equal(unanswered.source, "list");
+	assert.deepEqual(calls.service, ["verifymail:salemkeizer.org", "verifymail:wapium.com", "verifymail:hutdot.com"]);
+
+	// Saved, except the list's own verdict.
+	await checkEmail("b@salemkeizer.org");
+	await checkEmail("b@hutdot.com");
+	assert.deepEqual(calls.service.slice(3), ["verifymail:hutdot.com"]);
 });
 
 function apiRequest(path, body) {
@@ -70,7 +87,7 @@ test("the lists, then the service, then DNS decide, and each domain is looked up
 
 test("a domain no service could judge goes through on its mail server, unsaved, and stays pending in a sweep", async () => {
 	setEmailCheckLookups({
-		loadList: async () => new Set(),
+		loadList: async () => ({ strict: new Set(), loose: new Set() }),
 		checkWithService: async () => null,
 		lookUpMailServer: async () => ({ verdict: "ok", source: "dns" }),
 	});
@@ -94,7 +111,7 @@ test("rules block and allow ahead of every lookup", async () => {
 	]);
 	setEmailCheckLookups(null);
 	setEmailCheckLookups({
-		loadList: async () => new Set(),
+		loadList: async () => ({ strict: new Set(), loose: new Set() }),
 		checkWithService: async () => assert.fail("rules come first"),
 		lookUpMailServer: async () => assert.fail("rules come first"),
 	});
