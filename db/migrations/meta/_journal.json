@@ -64,6 +64,13 @@
       "when": 1793036124113,
       "tag": "0008_email_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793039416873,
+      "tag": "0009_automation_activated_at",
+      "breakpoints": true
     }
   ]
 }

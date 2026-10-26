@@ -100,7 +100,7 @@ export async function setAutomationStatus(id, status) {
 	}
 	await getDb()
 		.update(automations)
-		.set({ status, ...(status === "active" && { pausedReason: null }) })
+		.set({ status, ...(status === "active" && { pausedReason: null, activatedAt: new Date() }) })
 		.where(eq(automations._id, automation._id));
 	await notifyActivity([`Automation ${status === "active" ? "activated" : status}: ${automation.name}`, `${getAppUrl()}/automations/${automation._id}`]);
 	revalidate(automation._id);

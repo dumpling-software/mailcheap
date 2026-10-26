@@ -1,0 +1,1 @@
+ALTER TABLE "automations" ADD COLUMN "activated_at" timestamp with time zone;
