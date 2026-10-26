@@ -6,7 +6,8 @@ import { isPlainObject } from "@/lib/validation";
 
 const MAX_DOMAINS = 1000;
 const MAX_WAIT_SECONDS = 20;
-const PER_KEY = { name: "api-email-check-domains-key", limit: 600, window: "1 h" };
+// A sweep of ~10,000 domains takes a dozen calls per look, and an admin page looks often.
+const PER_KEY = { name: "api-email-check-domains-key", limit: 3000, window: "1 h" };
 const DOMAIN_PATTERN = /^[a-z0-9.-]{1,253}$/;
 
 function fail(status, error) {
