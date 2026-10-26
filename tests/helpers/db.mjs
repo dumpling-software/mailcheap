@@ -15,7 +15,7 @@ export async function createTestDb() {
 	setDb(db);
 	// Signup checks stay offline: no list, no service, every domain has a mail server.
 	setEmailCheckLookups({
-		loadList: async () => new Set(),
+		loadList: async () => ({ strict: new Set(), loose: new Set() }),
 		checkWithService: async () => null,
 		lookUpMailServer: async () => ({ verdict: "ok", source: "dns" }),
 	});
