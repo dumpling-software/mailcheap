@@ -102,3 +102,17 @@ test("framed issues keep web, mail and image links only", () => {
 	assert.ok(html.includes('src="data:image/png;base64,AAA"'));
 	assert.ok(!/javascript|&#106;|vbscript/i.test(html), html);
 });
+
+test("a framed link can't hide its real URL behind another attribute's quotes", () => {
+	const { html } = renderIssueBody({
+		format: "html",
+		html: `<!DOCTYPE html><html><head><base href="https://evil.test/"><meta http-equiv="refresh" content="0;url=https://evil.test"></head>
+<body><a x=" href='https:" href="javascript:alert(document.domain)" target="_blank" w="'">Read more</a>
+<a href=" java&#x09;script:alert(1)">Tab</a><table background="javascript:x"><tr><td>Cell</td></tr></table>
+<a href="{{unsubscribe_url}}">Unsubscribe</a><script>alert(1)</script></body></html>`,
+	});
+	assert.ok(!/javascript|evil\.test|<script/i.test(html), html);
+	assert.ok(html.startsWith("<!DOCTYPE html>"), "the frame keeps standards mode");
+	assert.equal(html.match(/<base\b[^>]*>/gi)?.join(), '<base target="_blank">', "only Mailcheap's own base tag");
+	assert.ok(html.includes("Read more") && html.includes("Cell") && html.includes('href="#"'));
+});

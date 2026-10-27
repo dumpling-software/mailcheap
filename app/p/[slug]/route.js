@@ -1,6 +1,7 @@
 import { getArchiveUrls } from "@/lib/archive-hosts";
 import { isArchiveEnabled } from "@/lib/config";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { PUBLISHED_STATUSES } from "@/lib/archive-data";
 import { campaigns, getDb, newsletters } from "@/lib/db";
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
@@ -14,7 +15,14 @@ export async function GET(request, { params }) {
 		.select({ slug: newsletters.slug })
 		.from(campaigns)
 		.innerJoin(newsletters, eq(newsletters._id, campaigns.newsletterId))
-		.where(and(eq(campaigns.archiveSlug, slug), eq(newsletters.archiveEnabled, true)));
+		// A draft's slug answers like one that doesn't exist, so the redirect can't confirm it.
+		.where(
+			and(
+				eq(campaigns.archiveSlug, slug),
+				eq(newsletters.archiveEnabled, true),
+				inArray(campaigns.status, PUBLISHED_STATUSES)
+			)
+		);
 	if (!newsletter) return new Response("Not found", { status: 404 });
 
 	return Response.redirect(new URL(getArchiveUrls(newsletter).post(slug), request.url), 307);

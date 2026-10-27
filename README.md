@@ -263,6 +263,7 @@ The designs for our products live in `templates/`. `node templates/build.mjs` re
 | `ARCHIVE_ENABLED` | No | `true` turns on the public archive and "Read online" links. Off by default. |
 | `ARCHIVE_HOSTS` | No | Archive domains, like `news.example.com=weekly,letters.example.org=monthly` |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | No | Shared rate limits |
+| `CLIENT_IP_HEADER` | No | Header that holds the visitor's IP for rate limits when a second proxy sits in front of the host, like `cf-connecting-ip` behind Cloudflare. Set it only if the host can't be reached around that proxy. By default Mailcheap uses `x-real-ip` on Vercel and the last `X-Forwarded-For` entry elsewhere. |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | No | Image uploads to Supabase Storage. `SUPABASE_STORAGE_BUCKET` picks the bucket (`uploads`). |
 | `ALERT_FROM` | No | From address for alert emails, on a verified domain |
 | `ALERT_ACTIVITY` | No | `true` also emails every login, new API key and send |

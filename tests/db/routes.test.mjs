@@ -62,6 +62,26 @@ test("the campaigns API creates drafts and lists sent issues", async () => {
 		new Request("https://mail.example.com/api/v1/campaigns?newsletter=api-drafts", { headers: { authorization: `Bearer ${apiKey}` } })
 	);
 	assert.deepEqual(await list.json(), { issues: [] });
+
+	const multiline = await POST(apiRequest("/api/v1/campaigns", { newsletter: "api-drafts", subject: "Weekly\r\nX-Injected: 1", markdown: "y" }));
+	const [stored] = await testDb.db.select().from(campaigns).where(eq(campaigns._id, (await multiline.json()).id));
+	assert.equal(stored.subject, "Weekly X-Injected: 1", "a subject keeps to one header line");
+});
+
+test("/p/:slug redirects to published issues only", async () => {
+	process.env.ARCHIVE_ENABLED = "true";
+	const { GET } = await import("../../app/p/[slug]/route.js");
+	const newsletter = await seedNewsletter(testDb.db, { slug: "p-weekly", archiveEnabled: true });
+	await testDb.db.insert(campaigns).values([
+		{ newsletterId: newsletter._id, subject: "Out", archiveSlug: "out-now", status: "sent" },
+		{ newsletterId: newsletter._id, subject: "Soon", archiveSlug: "coming-soon", status: "draft" },
+	]);
+	const open = (slug) => GET(new Request(`https://mail.example.com/p/${slug}`), { params: Promise.resolve({ slug }) });
+
+	assert.equal((await open("out-now")).status, 307);
+	assert.equal((await open("coming-soon")).status, 404, "a draft's slug answers like a missing one");
+	assert.equal((await open("missing")).status, 404);
+	delete process.env.ARCHIVE_ENABLED;
 });
 
 test("an unsubscribe link leaves only its own newsletter and credits the campaign", async () => {
@@ -103,4 +123,23 @@ test("an alert goes out once per cooldown", async () => {
 	await sendAlert({ key: "test-alert", title: "Test", detail: "third" });
 	const [third] = await testDb.db.select().from(alerts).where(eq(alerts.key, "test-alert"));
 	assert.ok(third.lastSentAt > first.lastSentAt);
+});
+
+test("double opt-in signups answer the same whether or not the address is on the list", async () => {
+	process.env.ARCHIVE_ENABLED = "true";
+	const { subscribe } = await import("../../app/archive/actions.js");
+	const newsletter = await seedNewsletter(testDb.db, { slug: "opt-in", archiveEnabled: true, requireConfirmation: true });
+	await seedContact(testDb.db, newsletter, { email: "member@example.com", status: "active" });
+	await seedContact(testDb.db, newsletter, { email: "bounced@example.com", status: "bounced" });
+	const signUp = async (email) => {
+		const form = new FormData();
+		form.set("newsletter", "opt-in");
+		form.set("email", email);
+		const { email: _, inbox: __, ...answer } = await subscribe(null, form);
+		return answer;
+	};
+
+	const answers = await Promise.all(["member@example.com", "bounced@example.com", "new@example.com"].map(signUp));
+	for (const answer of answers) assert.deepEqual(answer, { ok: true, pending: true });
+	delete process.env.ARCHIVE_ENABLED;
 });

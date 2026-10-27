@@ -59,7 +59,8 @@ export default function FormSubscribe({ newsletterSlug, className }) {
 	);
 }
 
-// Until they click the link, they get nothing: say so plainly and put their inbox one tap away.
+// Until they click the link, they get nothing: say so plainly and put their inbox one tap away. Members
+// who sign up again see the same card (the answer doesn't reveal who is on the list), so it says "if".
 function CardConfirmEmail({ email, inbox, className }) {
 	return (
 		<div
@@ -75,9 +76,9 @@ function CardConfirmEmail({ email, inbox, className }) {
 					<span className="absolute -top-0.5 -right-0.5 size-3 animate-pulse rounded-full bg-red-500 ring-2 ring-amber-50 dark:ring-transparent" />
 				</span>
 				<div className="min-w-0">
-					<p className="font-semibold text-amber-950 dark:text-amber-50">You&apos;re not subscribed yet</p>
+					<p className="font-semibold text-amber-950 dark:text-amber-50">Check your inbox</p>
 					<p className="mt-1 text-sm leading-relaxed text-pretty text-amber-950/75 dark:text-amber-50/75">
-						Click the link we just sent to{" "}
+						If you&apos;re not subscribed yet, click the link we just sent to{" "}
 						<strong className="font-semibold break-words text-amber-950 dark:text-amber-50">{email}</strong>.
 						Until you do, you won&apos;t get a single issue.
 					</p>

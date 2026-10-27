@@ -64,6 +64,8 @@ export async function subscribe(_state, formData) {
 			)
 		);
 	}
-	if (!isPending) return { ok: true };
+	// With confirmation on, every address gets the same answer, whether it's new, pending, already
+	// subscribed or blocked, so the form can't be used to check who is on the list.
+	if (!newsletter.requireConfirmation) return { ok: true };
 	return { ok: true, pending: true, email, inbox: getInbox({ email, fromEmail: newsletter.fromEmail }) };
 }
