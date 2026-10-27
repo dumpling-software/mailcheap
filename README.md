@@ -267,6 +267,7 @@ The designs for our products live in `templates/`. `node templates/build.mjs` re
 | `ALERT_FROM` | No | From address for alert emails, on a verified domain |
 | `ALERT_ACTIVITY` | No | `true` also emails every login, new API key and send |
 | `VERIFYMAIL_API_KEY` | No | verifymail.io key for signup email checks; DeBounce's free check without it |
+| `VERIFYMAIL_SWEEP_PER_DAY` | No | verifymail.io lookups a day for domain sweeps of existing users, so signups keep the rest of the quota (default 2500) |
 
 [`.env.example`](.env.example) has the same list with more detail.
 
@@ -300,7 +301,7 @@ curl -X POST https://<your-app>/api/v1/email-check \
   -d '{"email":"jane@example.com"}'
 ```
 
-**Sweep existing users**: `POST /api/v1/email-check/domains` with `{ "domains": [...] }` (up to 1,000) answers `{ results, pending }`: each domain's `{ verdict, source }`, where `verdict` is `ok`, `disposable`, `no_mail_server`, or `blocked`/`allowed` by a rule. Domains still being looked up after `wait` seconds (0 to 20, default 20; 0 answers only from rules, saved verdicts and the lists) come back `null`; call again for them. verifymail.io is skipped unless you pass `"verifymail": true`, so a sweep doesn't use up its daily quota.
+**Sweep existing users**: `POST /api/v1/email-check/domains` with `{ "domains": [...] }` (up to 1,000) answers `{ results, pending }`: each domain's `{ verdict, source }`, where `verdict` is `ok`, `disposable`, `no_mail_server`, or `blocked`/`allowed` by a rule. Domains still being looked up after `wait` seconds (0 to 20, default 20; 0 answers only from rules, saved verdicts and the lists) come back `null`; call again for them. A sweep uses verifymail.io for at most `VERIFYMAIL_SWEEP_PER_DAY` domains a day (2,500 by default), so signups keep the rest of its quota; a bigger sweep finishes over the following days. Pass `"verifymail": false` to skip it.
 
 **Record an event**: `POST /api/v1/events` with `newsletter`, `email`, `name` (like `api_key_created`), and optional `properties` and `occurredAt` (ISO date, last 30 days). Creates the contact if the newsletter doesn't have it yet (`source: "api"`), then starts or wakes the automations that wait for it. Answers `201` with `{ id, contactId, contactStatus, created }`.
 
