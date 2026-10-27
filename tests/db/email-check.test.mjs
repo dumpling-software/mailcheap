@@ -56,6 +56,9 @@ test("a domain only the loose list has is settled by verifymail, or blocked when
 	await checkEmail("b@salemkeizer.org");
 	await checkEmail("b@hutdot.com");
 	assert.deepEqual(calls.service.slice(3), ["verifymail:hutdot.com"]);
+
+	// A sweep leaves it pending instead.
+	assert.deepEqual(await checkDomains(["hutdot.com"], { paid: "sweep" }), { "hutdot.com": null });
 });
 
 function apiRequest(path, body) {
@@ -183,6 +186,10 @@ test("the domains API sweeps up to 1000 domains and counts what's pending", asyn
 	const { results, pending } = await response.json();
 	assert.deepEqual(Object.keys(results).sort(), ["gmail.com", "lugiz.com"]);
 	assert.equal(results["lugiz.com"].verdict, "disposable");
+	// verifymail.io within the sweep budget, unless turned off.
+	assert.equal(calls.paid, "sweep");
+	await POST(apiRequest("/api/v1/email-check/domains", { domains: ["new.example"], verifymail: false }));
+	assert.equal(calls.paid, false);
 	assert.equal(pending, 0);
 	const quick = await (await POST(apiRequest("/api/v1/email-check/domains", { domains: ["fresh.example"], wait: 0 }))).json();
 	assert.deepEqual(quick, { results: { "fresh.example": null }, pending: 1 });

@@ -14,11 +14,11 @@ function fail(status, error) {
 	return NextResponse.json({ error }, { status });
 }
 
-// { domains: [...], wait?: seconds, verifymail?: true } → { results: { [domain]: { verdict, source } | null },
+// { domains: [...], wait?: seconds, verifymail?: false } → { results: { [domain]: { verdict, source } | null },
 // pending }, to sweep an app's existing users. verdict is ok, disposable, no_mail_server, blocked or allowed;
 // null is still being looked up, so call again for those. wait (0-20, default 20) is how long lookups may run:
-// 0 answers from rules, saved verdicts and the lists only. verifymail.io is off unless asked, to keep its
-// quota for signups.
+// 0 answers from rules, saved verdicts and the lists only. verifymail.io is used within a daily budget
+// (VERIFYMAIL_SWEEP_PER_DAY) that keeps the rest of its quota for signups; verifymail: false turns it off.
 export async function POST(request) {
 	const apiKey = await authenticateRequest(request);
 	if (!apiKey) return fail(401, "Invalid API key");
@@ -31,7 +31,7 @@ export async function POST(request) {
 		DOMAIN_PATTERN.test(domain)
 	);
 	const wait = Math.min(Math.max(Number.isFinite(body.wait) ? body.wait : MAX_WAIT_SECONDS, 0), MAX_WAIT_SECONDS);
-	const results = await checkDomains(domains, { paid: body.verifymail === true, deadline: Date.now() + wait * 1000 });
+	const results = await checkDomains(domains, { paid: body.verifymail === false ? false : "sweep", deadline: Date.now() + wait * 1000 });
 	const pending = Object.values(results).filter((result) => !result).length;
 	return NextResponse.json({ results, pending });
 }
