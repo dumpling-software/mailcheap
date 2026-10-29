@@ -177,6 +177,19 @@ test("a sweep answers rules, lists and saved verdicts at once, looks up the rest
 
 	const late = await checkDomains(["late.example", "later.example"], { deadline: Date.now() - 1 });
 	assert.deepEqual(late, { "late.example": null, "later.example": null });
+
+	// A lookup still running at the deadline doesn't hold the answer, and is saved when it finishes.
+	setEmailCheckLookups({
+		loadList: async () => ({ strict: new Set(), loose: new Set() }),
+		checkWithService: () => new Promise((resolve) => setTimeout(() => resolve({ verdict: "disposable", source: "verifymail" }), 300)),
+	});
+	const started = Date.now();
+	assert.deepEqual(await checkDomains(["slow.example"], { deadline: Date.now() + 50 }), { "slow.example": null });
+	assert.ok(Date.now() - started < 250);
+	await new Promise((resolve) => setTimeout(resolve, 400));
+	assert.deepEqual(await checkDomains(["slow.example"], { deadline: Date.now() }), {
+		"slow.example": { verdict: "disposable", source: "verifymail" },
+	});
 });
 
 test("the domains API sweeps up to 1000 domains and counts what's pending", async () => {
