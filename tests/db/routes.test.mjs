@@ -21,9 +21,9 @@ before(async () => {
 });
 after(() => testDb.close());
 
-function apiRequest(path, body, key = apiKey) {
+function apiRequest(path, body, key = apiKey, method = "POST") {
 	return new Request(`https://mail.example.com${path}`, {
-		method: "POST",
+		method,
 		headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
 		body: JSON.stringify(body),
 	});
@@ -45,6 +45,27 @@ test("the contacts API creates a contact once and keeps an unsubscribe", async (
 
 	assert.equal((await POST(apiRequest("/api/v1/contacts", { newsletter: "nope", email: "a@example.com" }))).status, 404);
 	assert.equal((await POST(apiRequest("/api/v1/contacts", { newsletter: newsletter.slug, email: "a@example.com" }, "mc_bad"))).status, 401);
+});
+
+test("the contacts API moves a contact to a new address with its status", async () => {
+	const { PATCH } = await import("../../app/api/v1/contacts/route.js");
+	const { db } = testDb;
+	const newsletter = await seedNewsletter(db, { slug: "api-moves" });
+	const moving = await seedContact(db, newsletter, { email: "old@example.com", status: "unsubscribed" });
+	await seedContact(db, newsletter, { email: "taken@example.com" });
+	const change = (body, key) => PATCH(apiRequest("/api/v1/contacts", { newsletter: "api-moves", ...body }, key, "PATCH"));
+
+	const moved = await change({ email: "Old@Example.com", newEmail: "New@Example.com" });
+	assert.equal(moved.status, 200);
+	assert.deepEqual(await moved.json(), { id: moving._id, email: "new@example.com", status: "unsubscribed" });
+	const [row] = await db.select().from(contacts).where(eq(contacts._id, moving._id));
+	assert.equal(row.email, "new@example.com");
+
+	assert.equal((await change({ email: "old@example.com", newEmail: "other@example.com" })).status, 404);
+	assert.equal((await change({ email: "new@example.com", newEmail: "taken@example.com" })).status, 409);
+	assert.equal((await change({ email: "new@example.com", newEmail: "new@example.com" })).status, 400);
+	assert.equal((await change({ email: "new@example.com", newEmail: "nope" })).status, 400);
+	assert.equal((await change({ email: "new@example.com", newEmail: "x@example.com" }, "mc_bad")).status, 401);
 });
 
 test("the campaigns API creates drafts and lists sent issues", async () => {

@@ -127,6 +127,13 @@ function getExamples(appUrl) {
   -d '{"newsletter":"weekly","email":"jane@example.com","name":"api_key_created"}'`,
 		},
 		{
+			title: "Change a contact's address",
+			code: `curl -X PATCH ${appUrl}/api/v1/contacts \\
+  -H "Authorization: Bearer $MAILCHEAP_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"newsletter":"weekly","email":"jane@example.com","newEmail":"jane@newmail.com"}'`,
+		},
+		{
 			title: "Erase a contact (GDPR)",
 			code: `curl -X DELETE ${appUrl}/api/v1/contacts \\
   -H "Authorization: Bearer $MAILCHEAP_API_KEY" \\
