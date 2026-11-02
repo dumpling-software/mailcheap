@@ -5,7 +5,7 @@ import { onContactCreated, onPropertiesChanged } from "@/lib/automations/hooks";
 import { isSendingEnabled } from "@/lib/config";
 import { eraseContact, mergeProperties, resolveNewsletter } from "@/lib/contact-events";
 import { checkNewSignup } from "@/lib/email-check";
-import { upsertContact } from "@/lib/contacts";
+import { changeContactEmail, upsertContact } from "@/lib/contacts";
 import { getInbox } from "@/lib/inbox-links";
 import { readProperties } from "@/lib/properties";
 import { isRateLimited } from "@/lib/rate-limit";
@@ -18,6 +18,7 @@ const MAX_SOURCE_LENGTH = 100;
 const PER_KEY = { name: "api-contacts-key", limit: 600, window: "1 h" };
 const PER_VISITOR = { name: "api-contacts-ip", limit: 5, window: "10 m" };
 const ERASURES_PER_KEY = { name: "api-contacts-erase", limit: 600, window: "1 h" };
+const EMAIL_CHANGES_PER_KEY = { name: "api-contacts-email-change", limit: 600, window: "1 h" };
 const IP_PATTERN = /^[0-9a-f.:]{3,45}$/i;
 
 function fail(status, error) {
@@ -143,4 +144,30 @@ export async function DELETE(request) {
 	const { deleted } = await eraseContact({ email, newsletterId });
 	console.info(`[api/contacts] Erased ${deleted} contact(s)${newsletterId ? ` in ${newsletterId}` : ""}`);
 	return NextResponse.json({ deleted });
+}
+
+// { email, newEmail }: the person changed their address in the product. The contact moves to the new
+// address with everything it has, and no signup email goes out. 404 when the newsletter has no contact
+// for email, 409 when it already has one for newEmail. A key made for one newsletter changes it there.
+export async function PATCH(request) {
+	const apiKey = await authenticateRequest(request);
+	if (!apiKey) return fail(401, "Invalid API key");
+	if (await isRateLimited({ ...EMAIL_CHANGES_PER_KEY, key: String(apiKey._id) })) return fail(429, "Too many requests");
+
+	const body = await request.json().catch(() => null);
+	if (!isPlainObject(body)) return fail(400, "Send a JSON object");
+	if (body.newsletter !== undefined && typeof body.newsletter !== "string") return fail(400, "newsletter must be a slug or an id");
+	const email = normalizeEmail(body.email);
+	if (!email) return fail(400, "email is invalid");
+	const newEmail = normalizeEmail(body.newEmail);
+	if (!newEmail) return fail(400, "newEmail is invalid");
+	if (email === newEmail) return fail(400, "newEmail is the same address");
+
+	const resolved = await resolveNewsletter(body.newsletter, apiKey);
+	if (resolved.error) return fail(resolved.status, resolved.error);
+
+	const { contact, error } = await changeContactEmail({ newsletterId: resolved.newsletter._id, email, newEmail });
+	if (error === "not_found") return fail(404, "Contact not found");
+	if (error === "exists") return fail(409, "The newsletter already has a contact with newEmail");
+	return NextResponse.json({ id: String(contact._id), email: contact.email, status: contact.status });
 }

@@ -314,6 +314,8 @@ curl -X POST https://<your-app>/api/v1/events \
 
 **Erase a contact (GDPR)**: `DELETE /api/v1/contacts` with `{ "email": "..." }` removes the address from every newsletter: its contacts, events, suppression and the address on sent emails (their counts stay in campaign stats). Add `newsletter` to erase from one; a key made for one newsletter always erases there only. Answers `{ deleted }`.
 
+**Change a contact's address**: `PATCH /api/v1/contacts` with `{ "email": "old@...", "newEmail": "new@..." }` (and `newsletter` unless the key is made for one) moves the contact to the new address with its status, properties, history and automation runs, for when someone changes their email in your product. No welcome or confirmation email goes out. Answers `{ id, email, status }`, `404` when there is no contact for `email`, `409` when the newsletter already has `newEmail`.
+
 **Create a draft**: `POST /api/v1/campaigns` with `newsletter`, `subject`, `previewText` (optional), `html` or `markdown`, and `archiveSlug` (optional). Answers `201` with the draft's id and dashboard URL. Sending stays a click in the dashboard.
 
 **List sent issues**: `GET /api/v1/campaigns?newsletter=<slug>` returns each issue's id, subject, preview text, archive URL and send date.
