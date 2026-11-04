@@ -8,7 +8,7 @@ import { campaigns, getDb } from "@/lib/db";
 import { isRateLimited } from "@/lib/rate-limit";
 import { ARCHIVE_SLUG_PATTERN } from "@/lib/slug";
 import { firstImageUrl } from "@/lib/thumbnail";
-import { MAX_BODY_BYTES, isPlainObject } from "@/lib/validation";
+import { MAX_BODY_BYTES, isPlainObject, toHeaderLine } from "@/lib/validation";
 import { resolveNewsletter } from "@/lib/contact-events";
 
 const MAX_SUBJECT_LENGTH = 200;
@@ -30,7 +30,7 @@ function readInput(body) {
 	const { newsletter, subject, previewText, html, markdown, archiveSlug } = body;
 	if (typeof newsletter !== "string" || !newsletter.trim()) return { error: "newsletter is required" };
 	if (typeof subject !== "string" || !subject.trim()) return { error: "subject is required" };
-	if (subject.trim().length > MAX_SUBJECT_LENGTH) {
+	if (toHeaderLine(subject).length > MAX_SUBJECT_LENGTH) {
 		return { error: `subject must be at most ${MAX_SUBJECT_LENGTH} characters` };
 	}
 	if (!isOptionalString(previewText) || (previewText?.length ?? 0) > MAX_PREVIEW_TEXT_LENGTH) {
@@ -55,7 +55,7 @@ function readInput(body) {
 
 	return {
 		slug: newsletter.trim().toLowerCase(),
-		subject: subject.trim(),
+		subject: toHeaderLine(subject),
 		previewText: previewText?.trim() ?? "",
 		format,
 		content,

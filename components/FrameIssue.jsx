@@ -32,8 +32,12 @@ export default function FrameIssue({ html, className }) {
 				title="Issue"
 				srcDoc={html}
 				// Same origin lets the page read the issue's height; without allow-scripts nothing in it runs.
-				sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-				onLoad={(event) => setHeight(fitToWidth(event.currentTarget) ?? INITIAL_HEIGHT)}
+				// Popups stay sandboxed too: web links open through openLinksOutside instead.
+				sandbox="allow-same-origin allow-popups"
+				onLoad={(event) => {
+					openLinksOutside(event.currentTarget);
+					setHeight(fitToWidth(event.currentTarget) ?? INITIAL_HEIGHT);
+				}}
 				className="block size-full origin-top-left"
 			/>
 		</div>
@@ -54,4 +58,17 @@ function fitToWidth(frame) {
 	const scale = available / width;
 	Object.assign(frame.style, { height: `${height}px`, transform: scale < 1 ? `scale(${scale})` : "" });
 	return Math.ceil(height * scale);
+}
+
+// A tab opened from the frame inherits its sandbox, where most sites break without scripts. Letting
+// popups escape it would also free any link the server's cleaning missed, with the archive's origin. So
+// the page opens web links itself, and only those; mail and phone links keep the sandboxed popup.
+function openLinksOutside(frame) {
+	frame.contentDocument?.addEventListener("click", (event) => {
+		const link = event.target.closest?.("a[href]");
+		if (!link || event.defaultPrevented) return;
+		if (link.protocol !== "http:" && link.protocol !== "https:") return;
+		event.preventDefault();
+		window.open(link.href, "_blank", "noopener,noreferrer");
+	});
 }
