@@ -14,7 +14,7 @@ export const metadata = {
 };
 
 const SUBSCRIBED_STATUSES = ["active", "dormant"];
-const TOPIC_NAMES = { [AUTOMATIONS]: "automated emails" };
+const TOPIC_NAMES = { [AUTOMATIONS]: "tips & tutorials" };
 
 // Links in emails with a topic (lib/topics.js) leave that topic, with a second button to leave the
 // whole newsletter; links without one (signup emails, and every email sent before topics) leave it all.
