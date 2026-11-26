@@ -1,4 +1,4 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import CampaignReport from "@/components/CampaignReport";
 import FormCampaign from "@/components/FormCampaign";
@@ -10,6 +10,7 @@ import { messageStatsSelect } from "@/lib/message-stats";
 import { findCampaign, findNewsletter } from "@/lib/records";
 import { serialize } from "@/lib/serialize";
 import { listSesDomains } from "@/lib/ses";
+import { TOPICS, campaignTopic } from "@/lib/topics";
 
 export const metadata = { title: "Campaign" };
 
@@ -35,8 +36,8 @@ export default async function CampaignPage({ params }) {
 		);
 	}
 
-	const [audienceCount, domains, sendTimes] = await Promise.all([
-		countActive(newsletter._id),
+	const [audienceCounts, domains, sendTimes] = await Promise.all([
+		countActiveByTopic(newsletter._id),
 		listSesDomains(),
 		getSendTimes(campaign),
 	]);
@@ -50,7 +51,7 @@ export default async function CampaignPage({ params }) {
 			key={campaign.format}
 			campaign={serialize(campaign)}
 			newsletter={serialize(newsletter)}
-			audienceCount={audienceCount}
+			audienceCounts={audienceCounts}
 			isDomainVerified={isDomainVerified}
 			isSendingEnabled={isSendingEnabled()}
 			testEmail={process.env.ADMIN_EMAIL}
@@ -75,17 +76,22 @@ async function getSendTimes(campaign) {
 // left after receiving it make this a little low, and the send itself skips everyone who has it.
 async function countRemaining(campaign) {
 	if (campaign.status !== "sent" || !campaign.audienceLimit) return 0;
-	const active = await countActive(campaign.newsletterId);
+	const active = (await countActiveByTopic(campaign.newsletterId))[campaignTopic(campaign)];
 	const reached = (campaign.stats?.recipients ?? 0) + (campaign.lastChance?.recipients ?? 0);
 	return Math.max(0, active - reached);
 }
 
-async function countActive(newsletterId) {
+// Active contacts who get each topic (the editor's topic select changes the audience).
+async function countActiveByTopic(newsletterId) {
 	const [row] = await getDb()
-		.select({ count: count() })
+		.select(
+			Object.fromEntries(
+				TOPICS.map((topic) => [topic, sql`count(*) filter (where not (${topic}::text = any(${contacts.unsubscribedTopics})))`.mapWith(Number)])
+			)
+		)
 		.from(contacts)
 		.where(and(eq(contacts.newsletterId, newsletterId), eq(contacts.status, "active")));
-	return row.count;
+	return row;
 }
 
 async function getProviderBreakdown(campaignId) {

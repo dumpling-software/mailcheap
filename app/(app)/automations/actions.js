@@ -12,6 +12,7 @@ import { automations, enrollments, getDb } from "@/lib/db";
 import { findNewsletter } from "@/lib/records";
 import { getAutomationContent, sendAutomationTestEmail } from "@/lib/sending";
 import { getSendProblem } from "@/lib/sending-rules";
+import { isTopic } from "@/lib/topics";
 import { isPlainObject, isUuid } from "@/lib/validation";
 
 const MAX_NAME_LENGTH = 120;
@@ -55,6 +56,7 @@ function readDefinition(values) {
 		startNodeId: typeof values.startNodeId === "string" && values.startNodeId ? values.startNodeId : "start",
 		nodes: values.nodes,
 		allowReentry: values.allowReentry === true,
+		...(isTopic(values.topic) && { topic: values.topic }),
 	};
 	if (!isPlainObject(definition.trigger) || !isPlainObject(definition.nodes)) return { error: "The trigger and the nodes are required" };
 	return { definition };

@@ -208,8 +208,16 @@ Drip sequences per newsletter, started by a signup, an app event or a property c
 - **Triggers:** `contact_added` (a new active contact, or a confirmation), `event` (`name`), `property_changed` (`property`, optional `to`). Any trigger takes a `condition`.
 - **Nodes:** `send` (Markdown or HTML), `wait` (`30m`, `12h`, `4d`, `2w`), `wait_until` (a condition, or a timeout), `branch`, `exit`.
 - **Conditions:** `{ "property": "plan", "eq": "pro" }` (also `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `exists`), `{ "has_event": "x", "within_days": 7 }`, `{ "not_has_event": "x" }`, `{ "clicked": { "node": "help" } }` or `{ "campaign": "<id>" }`, `{ "opened": ... }` (unreliable: Apple Mail opens everything), `{ "status": "active" }`, `{ "source": "api" }`, `{ "signup_age_days": { "gte": 7 } }`, combined with `all`, `any` and `not`.
-- A contact goes through an automation once, unless it allows re-entry. Before every step Mailcheap checks `exitWhen` and that the contact is still subscribed; unsubscribes, bounces and complaints end the run. Each send node sends at most once per run, however often a job retries.
+- A contact goes through an automation once, unless it allows re-entry. Before every step Mailcheap checks `exitWhen` and that the contact is still subscribed; unsubscribes, bounces and complaints end the run. A contact who opted out of the automation's topic (below) leaves at its next send node, with the reason `unsubscribed from topic`. Each send node sends at most once per run, however often a job retries.
 - Events and property changes move waiting runs right away; the 5-minute QStash schedule moves the rest. An automation pauses itself when its bounce or complaint rate passes the campaign limits.
+
+## Topics
+
+Every campaign and automation belongs to a topic, so readers can stop one kind of email and keep the other: `product_updates` (the default for campaigns) and `automations` (the default for automations). The campaign and automation editors and `POST /api/v1/campaigns` set it.
+
+- A contact's opt-outs are in `unsubscribedTopics`: empty gets every topic. Campaigns leave out contacts who opted out of their topic (last-chance emails follow their campaign's topic), and automations let them go at the next send.
+- Unsubscribe links carry the email's topic: the one-click header and the page leave only that topic, and the page also offers "Unsubscribe from all" for the whole newsletter. Links in emails sent before topics, and in welcome and confirmation emails, have no topic and unsubscribe from the whole newsletter as before.
+- Set **Email settings page** on the newsletter (its product's notifications page) and the unsubscribe page links to it. The product reads and saves the preferences with `GET` and `PATCH /api/v1/contacts` (below).
 
 ## Email templates
 
@@ -317,14 +325,30 @@ curl -X POST https://<your-app>/api/v1/events \
 
 **Change a contact's address**: `PATCH /api/v1/contacts` with `{ "email": "old@...", "newEmail": "new@..." }` (and `newsletter` unless the key is made for one) moves the contact to the new address with its status, properties, history and automation runs, for when someone changes their email in your product. No welcome or confirmation email goes out. Answers `{ id, email, status }`, `404` when there is no contact for `email`, `409` when the newsletter already has `newEmail`.
 
-**Create a draft**: `POST /api/v1/campaigns` with `newsletter`, `subject`, `previewText` (optional), `html` or `markdown`, and `archiveSlug` (optional). Answers `201` with the draft's id and dashboard URL. Sending stays a click in the dashboard.
+**Read email preferences**: `GET /api/v1/contacts?email=<email>&newsletter=<slug>` (`newsletter` can be left out with a key made for one) answers `{ email, status, topics: { product_updates, automations } }`, where a topic is `true` only while the status is `active` or `pending` and the contact hasn't opted out of it. `404` when the newsletter has no contact for the address. Limited to 3,000 reads per key an hour.
+
+**Save email preferences**: `PATCH /api/v1/contacts` with `{ "email": "...", "topics": { "product_updates": true, "automations": false } }` (either topic can be left out), from your product's email settings page. Answers like `GET`.
+
+```bash
+curl -X PATCH https://<your-app>/api/v1/contacts \
+  -H "Authorization: Bearer $MAILCHEAP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"newsletter":"supadata","email":"jane@example.com","topics":{"automations":false}}'
+```
+
+- `false` opts out of the topic, `true` opts back in.
+- Turning a topic on is explicit consent: a contact who unsubscribed or went dormant becomes `active` again. Bounced and complained contacts and suppressed addresses keep their status; their topic choices are still saved.
+- A missing contact is added when at least one topic is turned on (`source: "preferences"`, the topics turned off already opted out), after the same email checks as `POST`, so it can get `422`. No welcome email or `contact_added` automations: the person already uses your product. When the newsletter confirms signups, the contact is `pending` and gets the confirmation email. With every topic off, a missing contact is `404`.
+- Limited to 600 changes per key an hour.
+
+**Create a draft**: `POST /api/v1/campaigns` with `newsletter`, `subject`, `previewText` (optional), `html` or `markdown`, `archiveSlug` (optional) and `topic` (optional, `product_updates` or `automations`, default `product_updates`). Answers `201` with the draft's id, dashboard URL and topic. Sending stays a click in the dashboard.
 
 **List sent issues**: `GET /api/v1/campaigns?newsletter=<slug>` returns each issue's id, subject, preview text, archive URL and send date.
 
 ## How it works
 
 - Next.js App Router, JavaScript, Tailwind CSS with shadcn/ui, Postgres (Supabase) through Drizzle ORM.
-- **Send** picks the audience (active contacts, suppressions left out, most engaged first), creates one message per reader, and queues one QStash job per batch of 50. Each job sends through the SES v2 API at `SEND_RATE_PER_SECOND` and pauses the campaign if bounce or complaint rates pass the limits.
+- **Send** picks the audience (active contacts, suppressions and opt-outs of the campaign's topic left out, most engaged first), creates one message per reader, and queues one QStash job per batch of 50. Each job sends through the SES v2 API at `SEND_RATE_PER_SECOND` and pauses the campaign if bounce or complaint rates pass the limits.
 - Welcome and confirmation emails go out right away, capped at 100 every 10 minutes per newsletter.
 - SES publishes events to SNS, which posts them to `/api/webhooks/ses`. Mailcheap verifies the SNS signature and updates the message, the campaign stats and the contact. A hard bounce suppresses the address for every newsletter; unsubscribes and spam complaints only stop the newsletter they came from.
 - Opens and clicks go through `/o/...` and `/c/...` on your app's domain. Clicks within 30 seconds of the send, or from known link scanners, don't count.

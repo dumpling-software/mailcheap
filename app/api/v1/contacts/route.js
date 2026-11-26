@@ -5,11 +5,12 @@ import { onContactCreated, onPropertiesChanged } from "@/lib/automations/hooks";
 import { isSendingEnabled } from "@/lib/config";
 import { eraseContact, mergeProperties, resolveNewsletter } from "@/lib/contact-events";
 import { checkNewSignup } from "@/lib/email-check";
-import { changeContactEmail, upsertContact } from "@/lib/contacts";
+import { changeContactEmail, findContactByEmail, setTopicPreferences, upsertContact } from "@/lib/contacts";
 import { getInbox } from "@/lib/inbox-links";
 import { readProperties } from "@/lib/properties";
 import { isRateLimited } from "@/lib/rate-limit";
 import { queueConfirmationEmail, queueWelcomeEmail } from "@/lib/sending";
+import { TOPICS, getTopicSubscriptions, isTopic } from "@/lib/topics";
 import { isPlainObject, normalizeEmail } from "@/lib/validation";
 
 const MAX_SOURCE_LENGTH = 100;
@@ -19,6 +20,10 @@ const PER_KEY = { name: "api-contacts-key", limit: 600, window: "1 h" };
 const PER_VISITOR = { name: "api-contacts-ip", limit: 5, window: "10 m" };
 const ERASURES_PER_KEY = { name: "api-contacts-erase", limit: 600, window: "1 h" };
 const EMAIL_CHANGES_PER_KEY = { name: "api-contacts-email-change", limit: 600, window: "1 h" };
+// The products' email settings pages read and save preferences on every visit.
+const PREFERENCE_READS_PER_KEY = { name: "api-contacts-read", limit: 3000, window: "1 h" };
+const PREFERENCE_CHANGES_PER_KEY = { name: "api-contacts-preferences", limit: 600, window: "1 h" };
+const PREFERENCES_SOURCE = "preferences";
 const IP_PATTERN = /^[0-9a-f.:]{3,45}$/i;
 
 function fail(status, error) {
@@ -146,17 +151,91 @@ export async function DELETE(request) {
 	return NextResponse.json({ deleted });
 }
 
+function toPreferences(contact) {
+	return { email: contact.email, status: contact.status, topics: getTopicSubscriptions(contact) };
+}
+
+function readTopics(topics) {
+	if (!isPlainObject(topics)) return { error: "topics must be an object" };
+	const entries = Object.entries(topics);
+	if (entries.length === 0) return { error: `topics needs at least one of ${TOPICS.join(", ")}` };
+	for (const [topic, subscribed] of entries) {
+		if (!isTopic(topic)) return { error: `Unknown topic ${topic}: use ${TOPICS.join(", ")}` };
+		if (typeof subscribed !== "boolean") return { error: `topics.${topic} must be a boolean` };
+	}
+	return { topics };
+}
+
+// ?email=&newsletter=: the contact's status and what it receives per topic, for the product's email
+// settings page. A topic is true only while the contact receives email (active or pending) and hasn't
+// opted out of it. 404 when the newsletter has no contact for the address.
+export async function GET(request) {
+	const apiKey = await authenticateRequest(request);
+	if (!apiKey) return fail(401, "Invalid API key");
+	if (await isRateLimited({ ...PREFERENCE_READS_PER_KEY, key: String(apiKey._id) })) return fail(429, "Too many requests");
+
+	const params = new URL(request.url).searchParams;
+	const email = normalizeEmail(params.get("email"));
+	if (!email) return fail(400, "email is invalid");
+	const resolved = await resolveNewsletter(params.get("newsletter") ?? undefined, apiKey);
+	if (resolved.error) return fail(resolved.status, resolved.error);
+
+	const contact = await findContactByEmail({ newsletterId: resolved.newsletter._id, email });
+	if (!contact) return fail(404, "Contact not found");
+	return NextResponse.json(toPreferences(contact));
+}
+
+// { email, topics: { product_updates?, automations? } }: saves the product's email settings page.
+// Turning a topic on brings back an unsubscribed or dormant contact, and adds a missing one (with the
+// same checks as POST, so it can be refused with 422). No welcome email or contact_added automations:
+// the person is already using the product. 404 when the contact is missing and nothing is turned on.
+async function updatePreferences(apiKey, body) {
+	if (await isRateLimited({ ...PREFERENCE_CHANGES_PER_KEY, key: String(apiKey._id) })) return fail(429, "Too many requests");
+	const email = normalizeEmail(body.email);
+	if (!email) return fail(400, "email is invalid");
+	const { topics, error } = readTopics(body.topics);
+	if (error) return fail(400, error);
+
+	const resolved = await resolveNewsletter(body.newsletter, apiKey);
+	if (resolved.error) return fail(resolved.status, resolved.error);
+	const { newsletter } = resolved;
+
+	let contact = await findContactByEmail({ newsletterId: newsletter._id, email });
+	if (!contact) {
+		if (!Object.values(topics).includes(true)) return fail(404, "Contact not found");
+		const refused = await checkNewSignup({ newsletter, email });
+		if (refused) return NextResponse.json({ error: refused.message, reason: refused.reason }, { status: 422 });
+		({ contact } = await upsertContact({ newsletter, email, source: PREFERENCES_SOURCE, resubscribe: false }));
+		// A newsletter that confirms signups still asks this address to confirm.
+		if (contact.status === "pending" && isSendingEnabled()) {
+			const pending = contact;
+			after(() =>
+				queueConfirmationEmail({ newsletter, contact: pending }).catch((error) =>
+					console.error(`[api/contacts] Confirmation email for ${pending._id} failed:`, error.message)
+				)
+			);
+		}
+	}
+	const updated = await setTopicPreferences({ contact, topics });
+	return NextResponse.json(toPreferences(updated));
+}
+
 // { email, newEmail }: the person changed their address in the product. The contact moves to the new
 // address with everything it has, and no signup email goes out. 404 when the newsletter has no contact
 // for email, 409 when it already has one for newEmail. A key made for one newsletter changes it there.
+// With topics instead of newEmail, it saves email preferences (updatePreferences above).
 export async function PATCH(request) {
 	const apiKey = await authenticateRequest(request);
 	if (!apiKey) return fail(401, "Invalid API key");
-	if (await isRateLimited({ ...EMAIL_CHANGES_PER_KEY, key: String(apiKey._id) })) return fail(429, "Too many requests");
 
 	const body = await request.json().catch(() => null);
 	if (!isPlainObject(body)) return fail(400, "Send a JSON object");
 	if (body.newsletter !== undefined && typeof body.newsletter !== "string") return fail(400, "newsletter must be a slug or an id");
+	if (body.topics !== undefined) {
+		if (body.newEmail !== undefined) return fail(400, "Send either topics or newEmail");
+		return updatePreferences(apiKey, body);
+	}
+	if (await isRateLimited({ ...EMAIL_CHANGES_PER_KEY, key: String(apiKey._id) })) return fail(429, "Too many requests");
 	const email = normalizeEmail(body.email);
 	if (!email) return fail(400, "email is invalid");
 	const newEmail = normalizeEmail(body.newEmail);

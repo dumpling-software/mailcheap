@@ -34,6 +34,15 @@ function isWithin(value, min, max) {
 	return value === undefined || (Number.isInteger(value) && value >= min && value <= max);
 }
 
+function isWebUrl(value) {
+	try {
+		const url = new URL(value);
+		return url.protocol === "https:" || url.protocol === "http:";
+	} catch {
+		return false;
+	}
+}
+
 function readNewsletter(formData) {
 	return {
 		name: readText(formData, "name"),
@@ -43,6 +52,7 @@ function readNewsletter(formData) {
 		fromEmail: readText(formData, "fromEmail").toLowerCase(),
 		replyTo: readText(formData, "replyTo").toLowerCase(),
 		postalAddress: readText(formData, "postalAddress"),
+		preferencesUrl: readText(formData, "preferencesUrl") || null,
 		archiveEnabled: formData.get("archiveEnabled") === "on",
 		description: readText(formData, "description"),
 		author: { bio: readText(formData, "authorBio"), imageUrl: readText(formData, "authorImageUrl") },
@@ -79,6 +89,7 @@ function validateNewsletter(values) {
 	}
 	if (!EMAIL_PATTERN.test(values.fromEmail)) return "From email is invalid";
 	if (values.replyTo && !EMAIL_PATTERN.test(values.replyTo)) return "Reply-to email is invalid";
+	if (values.preferencesUrl && !isWebUrl(values.preferencesUrl)) return "Email settings page must be an https:// link";
 	if (values.description.length > MAX_DESCRIPTION_LENGTH) {
 		return `Keep the description under ${MAX_DESCRIPTION_LENGTH} characters`;
 	}

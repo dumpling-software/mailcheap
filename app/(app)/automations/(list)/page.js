@@ -10,6 +10,7 @@ import { listAutomationsWithCounts } from "@/lib/automations/queries";
 import { formatNumber } from "@/lib/format";
 import { getCurrentNewsletter } from "@/lib/current-newsletter";
 import { toNewsletterOptions } from "@/lib/newsletters";
+import { TOPIC_LABELS, automationTopic } from "@/lib/topics";
 
 export const metadata = { title: "Automations" };
 
@@ -42,7 +43,7 @@ export default async function AutomationsPage() {
 							<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span className="truncate font-medium">{automation.name}</span>
 								<span className="truncate text-sm text-muted-foreground">
-									{describeTrigger(automation.trigger)}
+									{describeTrigger(automation.trigger)} · {TOPIC_LABELS[automationTopic(automation)]}
 								</span>
 							</div>
 							<dl className="hidden items-center gap-5 text-right text-sm sm:flex">

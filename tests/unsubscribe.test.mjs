@@ -149,3 +149,34 @@ test("links follow RFC 8058 and never include the email address", () => {
 	assert.equal(headers["List-Unsubscribe-Post"], "List-Unsubscribe=One-Click");
 	assert.doesNotMatch(pageUrl, /@/);
 });
+
+test("a token can carry a topic; one without it (every old email) stays a full unsubscribe", () => {
+	const topical = createUnsubscribeToken({ contactId, newsletterId, topic: "product_updates" });
+	assert.deepEqual(verifyUnsubscribeToken(topical), { contactId, newsletterId, topic: "product_updates" });
+	assert.deepEqual(verifyUnsubscribeToken(createUnsubscribeToken({ contactId, newsletterId, topic: "automations" })), {
+		contactId,
+		newsletterId,
+		topic: "automations",
+	});
+	// The exact payload links had before topics: no t, no topic in the reference.
+	const old = signLikeServer(JSON.stringify({ c: contactId, n: newsletterId }));
+	assert.deepEqual(verifyUnsubscribeToken(old), { contactId, newsletterId });
+	assert.equal(createUnsubscribeToken({ contactId, newsletterId, topic: null }), old);
+});
+
+test("unknown topics are refused when signing and verifying", () => {
+	assert.throws(() => createUnsubscribeToken({ contactId, newsletterId, topic: "everything" }), /Invalid unsubscribe topic/);
+	assert.equal(verifyUnsubscribeToken(signLikeServer(JSON.stringify({ c: contactId, n: newsletterId, t: "everything" }))), null);
+	assert.equal(verifyUnsubscribeToken(signLikeServer(JSON.stringify({ c: contactId, n: newsletterId, t: ["automations"] }))), null);
+	const [payload, signature] = createUnsubscribeToken({ contactId, newsletterId, topic: "automations" }).split(".");
+	const stripped = Buffer.from(JSON.stringify({ c: contactId, n: newsletterId })).toString("base64url");
+	assert.equal(verifyUnsubscribeToken(`${stripped}.${signature}`), null, "the topic can't be removed from a signed token");
+	assert.ok(payload);
+});
+
+test("links carry the email's topic in both the page and the one-click URL", () => {
+	const { pageUrl, headers } = getUnsubscribeLinks({ contactId, newsletterId, topic: "automations" });
+	const page = new URL(pageUrl).searchParams.get("token");
+	assert.equal(new URL(headers["List-Unsubscribe"].slice(1, -1)).searchParams.get("token"), page);
+	assert.equal(verifyUnsubscribeToken(page).topic, "automations");
+});
