@@ -8,6 +8,7 @@ const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBR
 // The image always loads; the open is recorded after the response, so readers never wait on it.
 export async function GET(_request, { params }) {
 	const messageId = readOpenToken((await params).token);
+	if (!messageId) console.warn("[tracking] Rejected open link (bad signature or format)");
 	if (messageId) {
 		after(() =>
 			recordEngagement({ messageId, type: "Open" }).catch((error) =>
