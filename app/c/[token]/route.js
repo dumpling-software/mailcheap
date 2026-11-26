@@ -19,7 +19,10 @@ function continuePage(url) {
 export async function GET(request, { params }) {
 	const link = readClickToken((await params).token);
 	if (!link) return new Response("Not found", { status: 404 });
-	if (!link.isSigned) return continuePage(link.url);
+	if (!link.isSigned) {
+		console.warn("[tracking] Rejected click link signature");
+		return continuePage(link.url);
+	}
 
 	const userAgent = request.headers.get("user-agent") ?? "";
 	after(() =>

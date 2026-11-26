@@ -133,7 +133,11 @@ export async function POST(request) {
 	if (await isRateLimited({ ...RATE_LIMIT, key: getClientIp(request.headers) })) return respond(429, "error");
 
 	const reference = verifyUnsubscribeToken(token);
-	if (!reference) return respond(400, "invalid");
+	if (!reference) {
+		// Counted after secret rotations: old links failing here means SESSION_SECRET_PREVIOUS is still needed.
+		console.warn(`[unsubscribe] Rejected link (${token ? "bad signature or format" : "no token"}, ${isPageForm ? "page" : "one-click"})`);
+		return respond(400, "invalid");
+	}
 
 	try {
 		if (reference.topic && !isAll) {
