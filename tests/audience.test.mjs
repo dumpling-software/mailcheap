@@ -73,3 +73,16 @@ test("contacts with equal engagement keep a stable order", () => {
 		["b", "a", "c"]
 	);
 });
+
+test("contacts who opted out of the campaign's topic are left out, other opt-outs aren't", () => {
+	const readers = [
+		contact("everything"),
+		contact("no-updates", { unsubscribedTopics: ["product_updates"] }),
+		contact("no-automations", { unsubscribedTopics: ["automations"] }),
+		contact("nothing", { unsubscribedTopics: ["product_updates", "automations"] }),
+	];
+	const ids = (options) => selectAudience(readers, options).map(({ _id }) => _id).toSorted();
+	assert.deepEqual(ids({ topic: "product_updates" }), ["everything", "no-automations"]);
+	assert.deepEqual(ids({ topic: "automations" }), ["everything", "no-updates"]);
+	assert.deepEqual(ids({}), ["everything", "no-automations", "no-updates", "nothing"], "no topic: status only");
+});

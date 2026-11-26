@@ -18,6 +18,7 @@ import { getCleanupPreview, queueCampaign, sendTestEmail, sendToMoreContacts } f
 import { getSendProblem } from "@/lib/sending-rules";
 import { ARCHIVE_SLUG_PATTERN } from "@/lib/slug";
 import { firstImageUrl } from "@/lib/thumbnail";
+import { campaignTopic, isTopic } from "@/lib/topics";
 import { MAX_BODY_BYTES } from "@/lib/validation";
 
 const MAX_SUBJECT_LENGTH = 200;
@@ -84,6 +85,7 @@ export async function saveCampaign(id, values) {
 			subject: toHeaderLine(values?.subject).slice(0, MAX_SUBJECT_LENGTH),
 			previewText: String(values?.previewText ?? "").slice(0, 300),
 			format,
+			...(isTopic(values?.topic) && { topic: values.topic }),
 			...(isMarkdown ? { markdown: body, html: "" } : { html: body, markdown: "" }),
 			thumbnailUrl: thumbnailUrl ?? null,
 		},
@@ -288,6 +290,7 @@ export async function duplicateCampaign(id) {
 			markdown: campaign.markdown,
 			html: campaign.html,
 			thumbnailUrl: campaign.thumbnailUrl,
+			topic: campaignTopic(campaign),
 			// A copy of an API draft is still content from the API key's holder, not from the dashboard.
 			...(campaign.source === "api" && { source: "api" }),
 		})

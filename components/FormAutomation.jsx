@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { linksOf, NODE_TYPES, validateAutomation } from "@/lib/automations/schema";
 import { formatNumber } from "@/lib/format";
+import { TOPICS, TOPIC_LABELS, automationTopic, isTopic } from "@/lib/topics";
 import { UNSUBSCRIBE_PLACEHOLDER, renderEmail, withResponsiveImages } from "@/lib/render-email";
 
 const END = "__end";
@@ -48,6 +49,7 @@ function toDefinition(state) {
 		startNodeId: state.startNodeId,
 		nodes: state.nodes,
 		allowReentry: state.allowReentry,
+		topic: automationTopic(state),
 	};
 }
 
@@ -355,6 +357,20 @@ function SettingsCard({ state, update }) {
 			<Field label="Leaves when" hint="Checked before every step, e.g. { &quot;has_event&quot;: &quot;first_api_call&quot; }">
 				<InputCondition value={state.exitWhen} optional onChange={(exitWhen) => update({ exitWhen })} />
 			</Field>
+			<Field label="Topic" hint="Contacts who unsubscribed from this topic leave the automation at its next email">
+				<Select value={automationTopic(state)} onValueChange={(topic) => update({ topic })}>
+					<SelectTrigger className="h-9 w-full" aria-label="Topic">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{TOPICS.map((topic) => (
+							<SelectItem key={topic} value={topic}>
+								{TOPIC_LABELS[topic]}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</Field>
 			<Field label="Again" hint="Can a contact go through it again after finishing?">
 				<Switch checked={state.allowReentry} onCheckedChange={(allowReentry) => update({ allowReentry })} aria-label="Allow re-entry" />
 			</Field>
@@ -626,7 +642,7 @@ function NodeStats({ stats }) {
 // The whole definition as JSON, for bigger edits and copying automations between newsletters.
 function EditorJson({ state, onApply }) {
 	const definition = JSON.stringify(
-		{ trigger: state.trigger, exitWhen: state.exitWhen, startNodeId: state.startNodeId, allowReentry: state.allowReentry, nodes: state.nodes },
+		{ trigger: state.trigger, exitWhen: state.exitWhen, startNodeId: state.startNodeId, allowReentry: state.allowReentry, topic: automationTopic(state), nodes: state.nodes },
 		null,
 		2
 	);
@@ -653,6 +669,7 @@ function EditorJson({ state, onApply }) {
 			exitWhen: parsed.exitWhen ?? null,
 			startNodeId: parsed.startNodeId ?? "start",
 			allowReentry: parsed.allowReentry === true,
+			...(isTopic(parsed.topic) && { topic: parsed.topic }),
 			nodes: parsed.nodes ?? {},
 		});
 		toast.success(problems.length ? "Applied, with problems to fix" : "Applied: save to keep it");

@@ -56,6 +56,8 @@ export const newsletters = pgTable(
 		confirmation: jsonb().notNull().default({}),
 		// { layout, css }: the product's email design (lib/email-template.js); null uses the built-in one.
 		template: jsonb(),
+		// The product's own email settings page, linked from the unsubscribe page.
+		preferencesUrl: text(),
 		...external(),
 		...timestamps(),
 	},
@@ -96,6 +98,8 @@ export const contacts = pgTable(
 		// What the apps know about the person (plan, name, company...): strings, numbers, booleans and
 		// ISO dates, set through the API (lib/properties.js) and read by automation conditions.
 		properties: jsonb().notNull().default({}),
+		// Topics (lib/topics.js) the contact opted out of while staying subscribed: empty gets them all.
+		unsubscribedTopics: text().array().notNull().default(sql`'{}'::text[]`),
 		...external(),
 		...timestamps(),
 	},
@@ -163,6 +167,8 @@ export const campaigns = pgTable(
 		stats: jsonb().notNull().default(CAMPAIGN_STATS),
 		// The list cleanup at this send: last-chance emails sent instead of the issue, and contacts made dormant.
 		lastChance: jsonb().notNull().default(LAST_CHANCE_STATS),
+		// lib/topics.js: contacts who opted out of it don't get the campaign (or its last-chance emails).
+		topic: text().notNull().default("product_updates"),
 		...external(),
 		...timestamps(),
 	},
@@ -363,6 +369,8 @@ export const automations = pgTable(
 		nodes: jsonb().notNull().default({}),
 		// Can a contact go through again once they finished?
 		allowReentry: boolean().notNull().default(false),
+		// lib/topics.js: a contact who opted out of it leaves the run at its next send.
+		topic: text().notNull().default("automations"),
 		pausedReason: text(),
 		// When it last became active: its health counts emails sent since, so a resume after fixing the
 		// cause isn't paused again by the bounces that paused it.

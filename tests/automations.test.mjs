@@ -185,3 +185,15 @@ test("triggers match their event, property change and condition", () => {
 	assert.equal(matchesTrigger(upgrade, { type: "property_changed", changes: [{ key: "plan", from: "pro", to: "free" }], context: ctx }), false);
 	assert.equal(matchesTrigger({ type: "contact_added", condition: { property: "plan", eq: "free" } }, { type: "contact_added", context: ctx }), false);
 });
+
+test("a contact who left the automation's topic exits at the next email, still subscribed", () => {
+	const optedOut = (topics) => context({ contact: { status: "active", properties: {}, unsubscribedTopics: topics } });
+	const result = run(ONBOARDING, { currentNodeId: "help" }, optedOut(["automations"]));
+	assert.deepEqual(result.effect, { type: "exit", reason: "unsubscribed from topic" });
+	assert.deepEqual(result.sends, []);
+	assert.deepEqual(run(ONBOARDING, { currentNodeId: "help" }, optedOut(["product_updates"])).sends, ["help"]);
+	const updates = { ...ONBOARDING, topic: "product_updates" };
+	assert.deepEqual(run(updates, { currentNodeId: "help" }, optedOut(["product_updates"])).effect, { type: "exit", reason: "unsubscribed from topic" });
+	// Opted out runs still wait: the exit happens at the send, so opting back in before it keeps the run.
+	assert.equal(run(ONBOARDING, { currentNodeId: "wait2" }, optedOut(["automations"])).effect.type, "wait");
+});

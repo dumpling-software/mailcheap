@@ -34,12 +34,14 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/format";
 import { markdownToHtml } from "@/lib/markdown";
 import { getPresendChecks } from "@/lib/presend-checks";
 import { UNSUBSCRIBE_PLACEHOLDER, renderEmail, withResponsiveImages } from "@/lib/render-email";
 import { slugify } from "@/lib/slug";
+import { TOPICS, TOPIC_LABELS, campaignTopic } from "@/lib/topics";
 import { useAutosave } from "@/lib/use-autosave";
 
 const UPLOADING_MESSAGE = "Wait for images to finish uploading";
@@ -47,7 +49,7 @@ const UPLOADING_MESSAGE = "Wait for images to finish uploading";
 export default function FormCampaign({
 	campaign,
 	newsletter,
-	audienceCount,
+	audienceCounts,
 	isDomainVerified,
 	isSendingEnabled,
 	testEmail,
@@ -70,7 +72,10 @@ export default function FormCampaign({
 		previewText: campaign.previewText,
 		body: campaign.format === "markdown" ? campaign.markdown : campaign.html,
 		format: campaign.format === "markdown" ? "markdown" : isHtml ? "html" : "rich",
+		topic: campaignTopic(campaign),
 	});
+	// Contacts who opted out of the topic don't get it.
+	const audienceCount = audienceCounts?.[values.topic] ?? 0;
 	const save = useCallback((snapshot) => saveCampaign(campaign._id, snapshot), [campaign._id]);
 	const { isDirty, isSaving, error, flush } = useAutosave(values, save);
 	const [isTesting, startTesting] = useTransition();
@@ -352,6 +357,20 @@ export default function FormCampaign({
 								</span>
 							</span>
 						</span>
+					</Row>
+					<Row label="Topic">
+						<Select value={values.topic} onValueChange={(topic) => setValues((current) => ({ ...current, topic }))}>
+							<SelectTrigger className="my-1 h-9 w-full" aria-label="Topic">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{TOPICS.map((topic) => (
+									<SelectItem key={topic} value={topic}>
+										{TOPIC_LABELS[topic]}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</Row>
 					<Row label="Subject">
 						<input

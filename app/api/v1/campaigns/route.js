@@ -10,6 +10,7 @@ import { ARCHIVE_SLUG_PATTERN } from "@/lib/slug";
 import { firstImageUrl } from "@/lib/thumbnail";
 import { MAX_BODY_BYTES, isPlainObject, toHeaderLine } from "@/lib/validation";
 import { resolveNewsletter } from "@/lib/contact-events";
+import { DEFAULT_CAMPAIGN_TOPIC, TOPICS, isTopic } from "@/lib/topics";
 
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_PREVIEW_TEXT_LENGTH = 300;
@@ -27,7 +28,7 @@ function isOptionalString(value) {
 
 function readInput(body) {
 	if (!isPlainObject(body)) return { error: "Send a JSON object" };
-	const { newsletter, subject, previewText, html, markdown, archiveSlug } = body;
+	const { newsletter, subject, previewText, html, markdown, archiveSlug, topic } = body;
 	if (typeof newsletter !== "string" || !newsletter.trim()) return { error: "newsletter is required" };
 	if (typeof subject !== "string" || !subject.trim()) return { error: "subject is required" };
 	if (toHeaderLine(subject).length > MAX_SUBJECT_LENGTH) {
@@ -52,6 +53,7 @@ function readInput(body) {
 	if (archiveSlug !== undefined && (typeof archiveSlug !== "string" || !ARCHIVE_SLUG_PATTERN.test(archiveSlug))) {
 		return { error: "archiveSlug can only use lowercase letters, numbers and dashes (120 at most)" };
 	}
+	if (topic !== undefined && !isTopic(topic)) return { error: `topic must be one of ${TOPICS.join(", ")}` };
 
 	return {
 		slug: newsletter.trim().toLowerCase(),
@@ -60,6 +62,7 @@ function readInput(body) {
 		format,
 		content,
 		archiveSlug,
+		topic: topic ?? DEFAULT_CAMPAIGN_TOPIC,
 	};
 }
 
@@ -111,11 +114,12 @@ export async function POST(request) {
 			thumbnailUrl: firstImageUrl({ format: input.format, html: input.content, markdown: input.content }) ?? null,
 			...(input.archiveSlug && { archiveSlug: await uniqueArchiveSlug(input.archiveSlug) }),
 			source: "api",
+			topic: input.topic,
 		})
 		.returning();
 	const id = String(campaign._id);
 	return NextResponse.json(
-		{ id, url: `${getAppUrl()}/campaigns/${id}`, archiveSlug: campaign.archiveSlug ?? null },
+		{ id, url: `${getAppUrl()}/campaigns/${id}`, archiveSlug: campaign.archiveSlug ?? null, topic: campaign.topic },
 		{ status: 201 }
 	);
 }

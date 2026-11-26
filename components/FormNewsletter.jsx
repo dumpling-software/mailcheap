@@ -216,6 +216,17 @@ export default function FormNewsletter({
 						placeholder="Company name, street, city, country"
 					/>
 				</Field>
+				<Field
+					label="Email settings page"
+					hint="Where readers manage their email preferences in your product. The unsubscribe page links to it."
+				>
+					<Input
+						name="preferencesUrl"
+						type="url"
+						defaultValue={newsletter?.preferencesUrl ?? ""}
+						placeholder="https://app.example.com/settings/notifications"
+					/>
+				</Field>
 			</Section>
 
 			<SectionTemplate
